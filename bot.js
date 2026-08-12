@@ -150,7 +150,7 @@ async function injectScanner(page) {
                      `Nói chuyện như một con người thật, biết hờn, dỗi, vui, buồn ` +
                      `Không được quá lịch sự, hãy coi người bên kia là thằng bạn cốt lên không phải giữ thể diện ` +
                      `Nếu nó xin tài liệu hay link học tập thì văng cái link ra cho nó kèm một câu khịa gắt.\n\n` +
-                     `Ngữ cảnh cuộc trò chuyện giữa bạn và ${targetName}:\n${contextText}\n\nPhản hồi cọc cằn của tao:`;
+                     `Ngữ cảnh cuộc trò chuyện giữa bạn và ${targetName}:\n${contextText}\n\n Thằng bạn:`;
         
         let aiReply = await askQuillBot(prompt);
         
