@@ -37,7 +37,7 @@ function parseStreamText(rawText) {
 async function askQuillBot(promptText) {
     try {
         const response = await axios.post(
-            "https://quillbot.com/api/ai-chat/chat/conversation/be6e38e2-1138-43e4-93ee-9af0bea2190a",
+            "https://quillbot.com/api/ai-chat/chat/conversation/442b5e89-17a0-48e6-bec7-82074acac2ab",
             {
                 message: { content: promptText + "\n\n" },
                 context: { editorContext: "", selectionContext: "", userDialect: "en-us", apiVersion: 2 },
