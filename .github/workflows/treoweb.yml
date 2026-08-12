@@ -1,0 +1,26 @@
+name: Sieu Bot Diet Lazi Rep Chat Bang QuillBot
+on:
+  workflow_dispatch: # Ông bấm nút kích hoạt phát súng đầu tiên, từ sau Bot tự gọi nhau
+
+permissions: write-all # Quyền tối cao để con Bot tự ra lệnh bật phiên mới cho chính nó
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # Nâng lên 6 tiếng (mức trần của GitHub) để Bot cày được lâu nhất
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cài đặt môi trường NodeJS và Chrome xịn
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y chromium-browser
+        npm install puppeteer-core axios form-data
+        
+    - name: Khoi chay he thong AI rep chat tu dong
+      run: node bot.js
+      env:
+        GH_TOKEN: ${{ github.token }} # Bơm Token bảo mật đặt đúng vị trí để lệnh tự gối đầu chạy được
+        
