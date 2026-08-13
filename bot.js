@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 const axios = require('axios');
 
 // Cookie dự phòng ban đầu của QuillBot
@@ -183,9 +183,17 @@ async function injectScanner(page) {
 (async () => {
     console.log("=== HỆ THỐNG BOT LAZI BẢN SIÊU CẤP TỰ ĐỘNG RELOAD MỖI 1 TIẾNG ===");
     
+    // Cấu hình Puppeteer-Core sử dụng Chromium hệ thống trên Ubuntu/GitHub Actions
     const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        executablePath: '/usr/bin/chromium-browser',
+        headless: 'new',
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gpu'
+        ]
     });
 
     await fetchFreshQuillBotConfig(browser);
