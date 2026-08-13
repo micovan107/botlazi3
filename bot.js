@@ -1,7 +1,7 @@
 const puppeteer = require('puppeteer-core');
 const axios = require('axios');
 
-// Cookie dự phòng ban đầu
+// Cookie dự phòng ban đầu của QuillBot
 const INITIAL_QUILLBOT_COOKIE = "abIDV2=492; _sp_ses.48cd=*; anonID=746e9178b57158d9; authenticated=false; premium=false; acceptedPremiumModesTnc=false; g_state={\"i_l\":0,\"i_ll\":1780744047776,\"i_b\":\"xmXnUoDTgPIl6ZZ+6e1JM2RI7bQ/yopAxaDotff/TOM\",\"i_e\":{\"enable_itp_optimization\":0},\"i_et\":1780744047770}; qdid=42efbd8009479e3ba4f5b3de2f36f505; connect.sid=s:_dHwC5cmuvC6tiaj8cSyrlWA7FdXdeo4.RlHPJOlT+GQQqSkZsIHlpcVyDqDHoMbY4mDoHmUry74; qb_anon_id=ea5e281f716950dae2176e6fe4ab79e01ec79de4b955e8868855c9a4dd80a962.8c83e63fac14f43253e54344390150552ca554a0b424d4e394163b97e07af70c; __cf_bm=D8YuS6xW4V_kQdhsb4ML.SB4TeT46YGfH3VwZdbovx8-1780744050.3231413-1.0.1.1-NobpSYvCP2IrTyt8huQ1qtkRsMdd2hr9buaVewHiCcC7SVO8y.FkdFb1K8r0PTxu4ETka6N_WgTK8K0PCzvcF6A5.3C_9oMXw93lcq0HFEFr6m8L_Yab3VdQNbn26Smq; AMP_MKTG_6e403e775d=%7B%22referrer%22%3A%22https%3A%2F%2Fwww.google.com%2F%22%2C%22referring_domain%22%3A%22www.google.com%22%7D; qbDeviceId=b2ec739d-e195-454f-81bb-a63786a781d9; cl_val=43; _gcl_au=1.1.1557228843.1780744049; OptanonConsent=isGpcEnabled=0&datestamp=Sat+Jun+06+2026+18%3A07%3A29+GMT%2B0700+(Gi%E1%BB%9D+%C4%90%C3%B4ng+D%C6%B0%C6%A1ng)&version=202605.1.0&browserGpcFlag=0&isDntEnabled=0&isIABGlobal=false&hosts=&landingPath=https%3A%2F%2Fquillbot.com%2Fai-chat&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CC0004%3A1%2CC0005%3A1; _ga=GA1.1.605710320.1780744050; FPID=FPID2.2.Dc9CYf2pr0fruo44EI+XnQz/vO9RkRUHcL3ww1t5xD4=.1780744050; FPLC=Fy8dOynxtOP6HdK7DxgdWFYvHQrDZ+dWLHrkBNcPE7yaWknvxrN+nzBPq8p27tiOVpCirhSVEIdj6XaDzD1/pMmoMauZrs+6J+1zsGCj1X+FiwQRU632uLgWvxBR8w==; FPAU=1.1.1557228843.1780744049; _clck=apdfri^2^g6o^0^2348; _clsk=1ddbi5m^1780744052215^1^0^t.clarity.ms/collect; _ga_D39F2PYGLM=GS2.1.s1780744049$o1$g1$t1780744052$j57$l0$h46958804; _uetsid=e8c43540619711f180111fdc8566318e; _uetvid=e8c485a0619711f1ae02d5451160de39; theme=dark; AMP_6e403e775d=%7B%22deviceId%22%3A%22b2ec739d-e195-454f-81bb-a63786a781d9%22%2C%22sessionId%22%3A1780744048890%2C%22optOut%22%3Afalse%2C%22lastEventTime%22%3A1780744180487%2C%22lastEventId%22%3A25%2C%22pageCounter%22%3A0%2C%22cookieDomain%22%3A%22.quillbot.com%22%7D; _sp_id.48cd=8a7e9aef-10e7-48d0-9588-819bed3fcb00.1780744047.1.1780744181..e01b7da6-3146-4b61-be9f-8ade984daf4c..bfcce7bd-c15b-402f-9e8f-c4b7057ea4f9.1780744048898.16";
 
 // Lưu trữ Link API và Header động thu thập được
@@ -15,14 +15,50 @@ let activeQuillBotHeaders = {
     "Cookie": INITIAL_QUILLBOT_COOKIE
 };
 
+// COOKIE LAZI MỚI CỦA ÔNG TẠI ĐÂY
 const RAW_LAZI_COOKIES = [
-  {"domain": "lazi.vn", "name": "PHPSESSID", "path": "/", "value": "kincnah3od5gqtk9rk0fgvevh0"},
-  {"domain": ".lazi.vn", "name": "lazi_identity", "path": "/", "value": "4038338"},
-  {"domain": ".lazi.vn", "name": "lazi_remember_code", "path": "/", "value": "fd291a2019111e7b871694f37b7c801e5395a114"},
-  {"domain": ".lazi.vn", "name": "lazi_vldu", "path": "/", "value": "zdvh9g57ELN6SEA8vGjW3cBYkWXA%2BsbMGphuVZJ4AJVZHgjXlbLW9UAtNsCk7%2BqPuMncus7ZmofdpCoRIp3ehWnyfdBrrg%3D%3D2z9ks57krt"},
-  {"domain": ".lazi.vn", "name": "lazi_identity_code", "path": "/", "value": "4038338"},
-  {"domain": ".lazi.vn", "name": "lazi_user_code", "path": "/", "value": "JLu7jWFQHBI12BALjNVClg0s5E0ZEudFe%2FOn%2FGgWQ%2BVhM5V%2FuJFb7gknddIKNCxJGbUK4cG5PqxQKACMm%2BXaqg%3D%3D"},
-  {"domain": ".lazi.vn", "name": "lazi_cms", "path": "/", "value": "FPKqNZ4G5oAmYWQop246xUI%2BmtdYDVk94nOHwHYNdRQpFnVFGxuugoPW2LfQ9iCoXwlCoZCepy9t2BEs%2FH5GrcY9vvy9f0AoMe6ybkw%2FTUnG2Vsnt1prM0%2FI2PhoYTP9SbYCyFFnkF3LPSPcDQOSgBbFXv6UPo%2FqxpAcV5Zb%2FOn9dU6mFXuQuvK6T3MQuYPZmEzGzARhR1TlJLJqFPLBJ3NTIWhXjighb9DrF5GM5bk4MqeXdt3aeGbutAEtAk2LZbm9MHryVKAqc%2B5Au12qvEChovjn3uMZ5%2FUBSkKYIatY7iTuue9e9dBlWRASHYJNXAiJou5f7gbpA5oevCEWMQNrPqSexlAfBvIlj2AURCRh9PuLt%2Fe42fViv2snyibuVsm%2Bk4y3%2FselIBJy46eStPq0y474FXJSyHCte9p8WQXhT%2F3t3Z9sxdwukESAbCTIp%2BJ9pG0xaIlPB0sdSfRXnSKmvASDRugi1YOEjBkCTHOdWjaIAMNQSeH6Jp0Qr8BqSwP9Prpc2%2F9Yl3uoKSeisnlMHmxJP2I2%2Bw6xVrT5lfCCALWoVv80CWS8iLVj%2FVGrITK8BZHseZEqc8KH1MraUPtVtkVEXc5xcWXuW97kqTQrBGEhrA1%2BszeWj9VQTALx"}
+  {
+    "domain": "lazi.vn",
+    "name": "PHPSESSID",
+    "path": "/",
+    "value": "4tj1q77mdspfce67o9f7bm3uc4"
+  },
+  {
+    "domain": ".lazi.vn",
+    "name": "lazi_identity",
+    "path": "/",
+    "value": "4657694"
+  },
+  {
+    "domain": ".lazi.vn",
+    "name": "lazi_remember_code",
+    "path": "/",
+    "value": "4838117af5d22fe39610ee3bc5292138b0b6e919"
+  },
+  {
+    "domain": ".lazi.vn",
+    "name": "lazi_vldu",
+    "path": "/",
+    "value": "2j0dsfabDhwP3cyXjfCw5%2BhXssqG81wugBeO05QCEfGEfkd2dj3c%2BMbHUp2eaeLGmjn%2FBYX4WknALJiCyoAihn1nGa5o2Q%3D%3Domzec2mb5s"
+  },
+  {
+    "domain": ".lazi.vn",
+    "name": "lazi_identity_code",
+    "path": "/",
+    "value": "4657694"
+  },
+  {
+    "domain": ".lazi.vn",
+    "name": "lazi_user_code",
+    "path": "/",
+    "value": "SDo0SyeXdgxuvP00XbFw1bJXwJP6lQwjOwAzH048gS7xvhPRMqX5KaoJB3r5K80TPE%2F6flp3Ai9esP2crjjl3A%3D%3D"
+  },
+  {
+    "domain": ".lazi.vn",
+    "name": "lazi_cms",
+    "path": "/",
+    "value": "H1cTHQcMDYQ%2F%2FY%2BIofx5ndj3kETm8TA4zHZpuBeVgzaUH3mEYGZE9Zyf6xMuXYmNw7YVW8qe%2FJ0Bo5FmqDtx3qU3Nymt9lemE6%2Fym995V7KopWx%2FUAKbr%2FPXZre8HYnovrAr%2B9bysP2OIEnq19yDhudUIjm90xMXtjnJQtkuJx6Udt7vgNGscn1sYMr9Kj6mPC4XhxWH3dfBbI8rqQkTUbchDUooXUug1MtWhFzaGXudJ9rj0QB5vIXNd5WPqthFlsQgvjq%2Bf7Mnu0LIDHBZBAIPPwaDyylmvYYeiwDdHQYtZbNeMxVBVCjkdIhQ3bgAfui6dFUWPsEyePiU7VQs%2B86qqgHZaaugGObY0CMRwehbWw4KmzKwakFoiYDE8qa%2BNTuXprH6GROf4bLYWaFtjMENVZVfR7WxRUITbZ8Sg5KHvWI%2BgTpTzI5s8ZIU7pstfsv4BwPndZne7ZGwShKl7RsRDGSqcR6fnRNdczp8Xk7L%2B1QJAmHZoD%2BAgf0B8yX103S%2BwAsLNpLWf8NDZMKWCeM1U2X%2BuvYAzbK3LBfaCEUNITY%2Bb1uD5Azpan6K0hjQR3DgRlpsNMO37pLaIPnxMMKqFEyUz3Xe27uVnz9kxFO0vuPASySMXl5e1vhu0Pso"
+  }
 ];
 
 const LAZI_COOKIES = RAW_LAZI_COOKIES.map(cookie => {
@@ -46,7 +82,7 @@ function parseStreamText(rawText) {
     return accumulatedContent;
 }
 
-// Hàm mở tab QuillBot ngầm để "săn" Link API conversation tươi + Cookie/Headers mới nhất
+// Mở tab QuillBot ngầm để "săn" Link API conversation tươi + Cookie/Headers mới nhất
 async function fetchFreshQuillBotConfig(browser) {
     console.log("[QuillBot Fetcher] Đang khởi tạo tab ngầm để săn Link API tươi...");
     let qbPage = null;
@@ -61,7 +97,6 @@ async function fetchFreshQuillBotConfig(browser) {
                 console.log('\n[QuillBot Fetcher] ==> ĐÃ BẮT ĐƯỢC LINK API MỚI:', url);
                 activeQuillBotApiUrl = url;
                 
-                // Lấy toàn bộ headers gửi đi từ browser (chứa Cookie + Auth tươi nhất)
                 const headers = interceptedRequest.headers();
                 activeQuillBotHeaders = {
                     ...activeQuillBotHeaders,
@@ -76,16 +111,14 @@ async function fetchFreshQuillBotConfig(browser) {
 
         await qbPage.goto('https://quillbot.com/ai-chat', { waitUntil: 'networkidle2', timeout: 60000 });
 
-        // Gõ nhẹ 1 chữ mồi để QuillBot tự bắn Request API khởi tạo conversation
         const inputSelector = 'textarea, div[contenteditable="true"]';
         await qbPage.waitForSelector(inputSelector, { timeout: 10000 });
         await qbPage.type(inputSelector, 'Hi');
         await qbPage.keyboard.press('Enter');
 
-        // Chờ 3 giây để bắt kịp Request
         await new Promise(r => setTimeout(r, 3000));
     } catch (err) {
-        console.error("[QuillBot Fetcher Lỗi] Không tự vớt được API mới, sẽ dùng config fallback:", err.message);
+        console.error("[QuillBot Fetcher Lỗi] Không tự vớt được API mới, dùng fallback:", err.message);
     } finally {
         if (qbPage) await qbPage.close().catch(() => {});
     }
@@ -179,7 +212,7 @@ async function injectScanner(page) {
         args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
-    // Bắt API QuillBot tươi ngay từ lúc chạy
+    // Bắt API QuillBot tươi ngay từ lúc khởi động
     await fetchFreshQuillBotConfig(browser);
     
     const page = await browser.newPage();
@@ -192,7 +225,7 @@ async function injectScanner(page) {
 
     console.log("Đang truy cập Lazi.vn...");
     await page.goto('https://lazi.vn', { waitUntil: 'networkidle2' });
-    console.log("-> Đăng nhập thành công!");
+    console.log("-> Đăng nhập thành công với Acc ID: 4657694!");
 
     await page.exposeFunction('handleNewMessage', async (boxId, targetName, contextText) => {
         console.log(`[NodeJS] Nhận tin từ [${targetName}] ở Box ID: ${boxId}. Tiến hành xử lý...`);
@@ -245,7 +278,7 @@ async function injectScanner(page) {
     let timeElapsed = 0;
     let timeSinceLastReload = 0;
 
-    console.log(`[Hệ thống] Bot dự kiến cày bừa trong ${TOTAL_RUN_TIME / 60000} phút. Sẽ tự động F5 sau mỗi 60 phút.`);
+    console.log(`[Hệ thống] Bot dự kiến chạy trong ${TOTAL_RUN_TIME / 60000} phút. Sẽ tự động F5 sau mỗi 60 phút.`);
 
     while (timeElapsed < TOTAL_RUN_TIME) {
         await new Promise(resolve => setTimeout(resolve, CHECK_INTERVAL));
@@ -253,35 +286,31 @@ async function injectScanner(page) {
         timeSinceLastReload += CHECK_INTERVAL;
 
         if (timeSinceLastReload >= RELOAD_INTERVAL) {
-            console.log("\n[Hệ thống] Đã chạy tròn 1 tiếng! Tiến hành làm mới (Reload) Lazi & cập nhật lại API QuillBot...");
+            console.log("\n[Hệ thống] Đã chạy 1 tiếng! Reload Lazi & cập nhật lại API QuillBot...");
             try {
-                // Tải lại API QuillBot tươi mới để tránh bị nghẽn/hết hạn
                 await fetchFreshQuillBotConfig(browser);
-
                 await page.reload({ waitUntil: 'networkidle2' });
                 
                 for (const ck of LAZI_COOKIES) {
                     await page.setCookie(ck);
                 }
-                console.log("[Hệ thống] Đã làm mới trang Lazi và ép lại Cookie đăng nhập thành công.");
+                console.log("[Hệ thống] Đã làm mới trang Lazi và nạp lại Cookie thành công.");
                 
                 await injectScanner(page);
-                
                 timeSinceLastReload = 0;
             } catch (reloadErr) {
-                console.error("[Hệ thống Lỗi] Không thể reload trang, giữ nguyên phiên chạy cũ:", reloadErr.message);
+                console.error("[Hệ thống Lỗi] Không thể reload trang:", reloadErr.message);
             }
         }
     }
     
-    console.log("=== SẮP HẾT 6 TIẾNG GIỚI HẠN! TIẾN HÀNH KÍCH HOẠT PHIÊN MỚI GỐI ĐẦU ===");
-    
+    console.log("=== KÍCH HOẠT PHIÊN MỚI GỐI ĐẦU ===");
     try {
         const { execSync } = require('child_process');
         execSync('gh workflow run treoweb.yml', { stdio: 'inherit' });
-        console.log("-> Kích hoạt phiên mới thành công! Phiên cũ chuẩn bị rút lui an toàn.");
+        console.log("-> Kích hoạt phiên mới thành công!");
     } catch (err) {
-        console.error("Lỗi nghiêm trọng khi gọi phiên mới:", err.message);
+        console.error("Lỗi khi gọi phiên mới:", err.message);
     }
 
     await browser.close();
