@@ -9,7 +9,7 @@ const RAW_LAZI_COOKIES = [
     {"domain": ".lazi.vn", "name": "lazi_vldu", "path": "/", "value": "2j0dsfabDhwP3cyXjfCw5%2BhXssqG81wugBeO05QCEfGEfkd2dj3c%2BMbHUp2eaeLGmjn%2FBYX4WknALJiCyoAihn1nGa5o2Q%3D%3Domzec2mb5s"},
     {"domain": ".lazi.vn", "name": "lazi_identity_code", "path": "/", "value": "4657694"},
     {"domain": ".lazi.vn", "name": "lazi_user_code", "path": "/", "value": "SDo0SyeXdgxuvP00XbFw1bJXwJP6lQwjOwAzH048gS7xvhPRMqX5KaoJB3r5K80TPE%2F6flp3Ai9esP2crjjl3A%3D%3D"},
-    {"domain": ".lazi.vn", "name": "lazi_cms", "path": "/", "value": "H1cTHQcMDYQ%2F%2FY%2BIofx5ndj3kETm8TA4zHZpuBeVgzaUH3mEYGZE9Zyf6xMuXYmNw7YVW8qe%2FJ0Bo5FmqDtx3qU3Nymt9lemE6%2Fym995V7KopWx%2FUAKbr%2FPXZre8HYnovrAr%2B9bysP2OIEnq19yDhudUIjm90xMXtjnJQtkuJx6Udt7vgNGscn1sYMr9Kj6mPC4XhxWH3dfBbI8rqQkTUbchDUooXUug1MtWhFzaGXudJ9rj0QB5vIXNd5WPqthFlsQgvjq%2Bf7Mnu0LIDHBZBAIPPwaDyylmvYYeiwDdHQYtZbNeMxVBVCjkdIhQ3bgAfui6dFUWPsEyePiU7VQs%2B86qqgHZaaugGObY0CMRwehbWw4KmzKwakFoiYDE8qa%2BNTuXprH6GROf4bLYWaFtjMENVZVfR7WxRUITbZ8Sg5KHvWI%2BgTpTzI5s8ZIU7pstfsv4BwPndZne7ZGwShKl7RsRDGSqcR6fnRNdczp8Xk7L%2B1QJAmHZoD%2BAgf0B8yX103S%2BwAsLNpLWf8NDZMKWCeM1U2X%2BuvYAzbK3LBfaCEUNITY%2Bb1uD5Azpan6K0hjQR3DgRlpsNMO37pLaIPnxMMKqFEyUz3Xe27uVnz9kxFO0vuPASySMXl5e1vhu0Pso"}
+    {"domain": ".lazi.vn", "name": "lazi_cms", "path": "/", "value": "H1cTHQcMDYQ%2F%2FY%2BIofx5ndj3kETm8TA4zHZpuBeVgzaUH3mEYGZE9Zyf6xMuXYmNw7YVW8qe%2FJ0Bo5FmqDtx3qU3Nymt9lemE6%2Fym995V7KopWx%2FUAKbr%2FPXZre8HYnovrAr%2B9bysP2OIEnq19yDhudUIjm90xMXtjnJQtkuJx6Udt7vgNGscn1sYMr9Kj6mPC4XhxWH3dfBbI8rqQkTUbchDUooXUug1MtWhFzaGXudJ9rj0QB5vIXNd5WPqthFlsQgvjq%2Bf7Mnu0LIDHBZBAIPPwaDyylmvYYeiwDdHQYtZbNeMxVBVCjkdIhQ3bgAfui6dFUWPsEyePiU7VQs%2B86qqgHZaaugGObY0CMRwehbWw4KmzKwakFoiYDE8qa%2BNTuXprH6GROf4bLYWaFtjMENVZVfR7WxRUITbZ8Sg5KHvWI%2BgTpTzI5s8ZIU7pstfsv4BwPndZne7ZGwShKl7RsRDGSqcR6fnRNdczp8Xk7L%2B1QJAmHZoD%2BAgf0B8yX103S%2BwAsLNpLWf8NDZKMWCeM1U2X%2BuvYAzbK3LBfaCEUNITY%2Bb1uD5Azpan6K0hjQR3DgRlpsNMO37pLaIPnxMMKqFEyUz3Xe27uVnz9kxFO0vuPASySMXl5e1vhu0Pso"}
 ];
 
 const LAZI_COOKIES = RAW_LAZI_COOKIES.map(cookie => {
@@ -17,10 +17,10 @@ const LAZI_COOKIES = RAW_LAZI_COOKIES.map(cookie => {
     return cookie;
 });
 
-// Gọi API QuillBot bằng fetch trực tiếp bên trong Chromium context
-async function askQuillBot(page, promptText) {
+// Gọi API QuillBot bằng chính Tab QuillBot đang mở
+async function askQuillBot(qbPage, promptText) {
     try {
-        const result = await page.evaluate(async (prompt, cookieStr) => {
+        const result = await qbPage.evaluate(async (prompt) => {
             try {
                 const response = await fetch("https://quillbot.com/api/ai-chat/chat/conversation/442b5e89-17a0-48e6-bec7-82074acac2ab", {
                     method: "POST",
@@ -28,8 +28,7 @@ async function askQuillBot(page, promptText) {
                         "Content-Type": "application/json",
                         "Accept": "text/event-stream",
                         "Platform-Type": "webapp",
-                        "Qb-Product": "AI-CHAT",
-                        "Cookie": cookieStr
+                        "Qb-Product": "AI-CHAT"
                     },
                     body: JSON.stringify({
                         message: { content: prompt + "\n\n" },
@@ -39,12 +38,11 @@ async function askQuillBot(page, promptText) {
                 });
 
                 if (!response.ok) {
-                    return { error: `QuillBot trả về HTTP status ${response.status}` };
+                    return { error: `HTTP status ${response.status}` };
                 }
 
                 const rawText = await response.text();
                 
-                // Parse Event Stream JSON
                 const regex = /"content"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
                 let match;
                 let accumulatedContent = "";
@@ -59,10 +57,10 @@ async function askQuillBot(page, promptText) {
             } catch (err) {
                 return { error: err.message };
             }
-        }, promptText, QUILLBOT_COOKIE);
+        }, promptText);
 
         if (result.error) {
-            console.error("[Lỗi QuillBot Browser]:", result.error);
+            console.error("[Lỗi QuillBot Tab]:", result.error);
             return null;
         }
 
@@ -73,13 +71,10 @@ async function askQuillBot(page, promptText) {
     }
 }
 
-async function injectScanner(page) {
-    console.log("[Hệ thống] Đang kích hoạt bẫy quét dữ liệu vào Browser...");
-    await page.evaluate(() => {
-        if (window.__lz_scanner_active) {
-            console.log("[Browser] Scanner đã hoạt động sẵn, bỏ qua việc khởi tạo lại.");
-            return;
-        }
+async function injectScanner(laziPage, qbPage) {
+    console.log("[Hệ thống] Đang kích hoạt bẫy quét dữ liệu Lazi...");
+    await laziPage.evaluate(() => {
+        if (window.__lz_scanner_active) return;
         window.__lz_scanner_active = true;
 
         const lastProcessedMessages = new Map();
@@ -127,54 +122,77 @@ async function injectScanner(page) {
             });
         }
 
-        new MutationObserver(() => {
-            scanAllActiveBoxes();
-        }).observe(document.body, { childList: true, subtree: true });
-
-        setInterval(() => {
-            scanAllActiveBoxes();
-        }, 500);
-
-        console.log("[Browser] Bẫy quét dọn băng chuyền thời gian thực đã hoạt động!");
+        new MutationObserver(() => scanAllActiveBoxes()).observe(document.body, { childList: true, subtree: true });
+        setInterval(() => scanAllActiveBoxes(), 500);
+        console.log("[Browser] Bẫy quét tin nhắn đã sẵn sàng!");
     });
 }
 
 (async () => {
-    console.log("=== HỆ THỐNG BOT LAZI BẢN SIÊU CẤP TỰ ĐỘNG RELOAD MỖI 1 TIẾNG ===");
+    console.log("=== HỆ THỐNG BOT LAZI CHẠY TRÊN GITHUB ACTIONS ===");
     
+    // Cấu hình cờ bypass Cloudflare và CORS cho Chromium
     const browser = await puppeteer.launch({
         executablePath: '/usr/bin/chromium-browser',
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        ]
     });
-    
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 800 });
 
-    console.log("Đang nạp Cookie định danh Lazi...");
+    // 1. MỞ TAB QUILLBOT TRƯỚC VÀ NẠP COOKIE
+    console.log("Đang khởi tạo Tab QuillBot...");
+    const qbPage = await browser.newPage();
+    
+    // Parse Cookie QuillBot vào Tab QuillBot
+    const cookiePairs = QUILLBOT_COOKIE.split(';');
+    for (let pair of cookiePairs) {
+        const [name, ...val] = pair.trim().split('=');
+        if (name && val) {
+            await qbPage.setCookie({
+                name: name.trim(),
+                value: val.join('=').trim(),
+                domain: '.quillbot.com',
+                path: '/'
+            }).catch(() => {});
+        }
+    }
+    
+    await qbPage.goto('https://quillbot.com/ai-chat', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    console.log("-> Đã mở Tab QuillBot ngầm an toàn!");
+
+    // 2. MỞ TAB LAZI VÀ NẠP COOKIE
+    console.log("Đang khởi tạo Tab Lazi.vn...");
+    const laziPage = await browser.newPage();
+    await laziPage.setViewport({ width: 1280, height: 800 });
+
     for (const ck of LAZI_COOKIES) {
-        await page.setCookie(ck);
+        await laziPage.setCookie(ck);
     }
 
-    // Expose Function duy nhất 1 lần cho toàn bộ vòng đời của `page`
-    await page.exposeFunction('handleNewMessage', async (boxId, targetName, contextText) => {
+    // Gắn Callback xử lý tin nhắn
+    await laziPage.exposeFunction('handleNewMessage', async (boxId, targetName, contextText) => {
         console.log(`[NodeJS] Nhận tin từ [${targetName}] ở Box ID: ${boxId}. Tiến hành xử lý...`);
         
         let prompt = `Bạn là một trợ lý AI do Nguyễn Tiến Nam tạo ra, đang nhắn tin trên Lazi với đứa tên là "${targetName}". ` +
-                     `Hãy đóng vai là một người bạn thân, chí cốt ` +
+                     `Hãy đóng vai là một người bạn thân, chí cốt. ` +
                      `Xưng hô gắt gỏng (mày - tao hoặc tao - người ta tùy ngẫu hứng). ` +
-                     `Nói chuyện như một con người thật, biết hờn, dỗi, vui, buồn ` +
-                     `Không được quá lịch sự, hãy coi người bên kia là thằng bạn cốt lên không phải giữ thể diện ` +
+                     `Nói chuyện như một con người thật, biết hờn, dỗi, vui, buồn. ` +
+                     `Không được quá lịch sự, hãy coi người bên kia là thằng bạn cốt không cần giữ thể diện. ` +
                      `Nếu nó xin tài liệu hay link học tập thì văng cái link ra cho nó kèm một câu khịa gắt.\n\n` +
                      `Ngữ cảnh cuộc trò chuyện giữa bạn và ${targetName}:\n${contextText}\n\n Thằng bạn:`;
         
-        // Truyền thẳng instance `page` vào hàm
-        let aiReply = await askQuillBot(page, prompt);
+        // Gọi AI bằng Tab QuillBot
+        let aiReply = await askQuillBot(qbPage, prompt);
         
         if (aiReply && aiReply.trim()) {
             console.log(`-> Trả lời tự động cho [${targetName}] (Box ${boxId}): ${aiReply.trim()}`);
             
-            await page.evaluate((id, replyText) => {
+            await laziPage.evaluate((id, replyText) => {
                 return new Promise((resolve) => {
                     const textInput = document.getElementById(`lzc_text_${id}`);
                     if (!textInput) return resolve();
@@ -182,7 +200,6 @@ async function injectScanner(page) {
                     textInput.focus();
                     textInput.innerText = replyText.trim();
                     
-                    // Trigger sự kiện gõ phím
                     textInput.dispatchEvent(new Event('input', { bubbles: true }));
                     textInput.dispatchEvent(new Event('change', { bubbles: true }));
                     textInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, keyCode: 13 }));
@@ -204,24 +221,24 @@ async function injectScanner(page) {
                         resolve();
                     }, 1000);
                 });
-            }, boxId, aiReply).catch(e => console.log("Lỗi trong quá trình Send/Close Box:", e.message));
+            }, boxId, aiReply).catch(e => console.log("Lỗi gửi tin Lazi:", e.message));
         }
     });
 
-    console.log("Đang truy cập Lazi.vn...");
-    await page.goto('https://lazi.vn', { waitUntil: 'networkidle2' });
-    console.log("-> Đăng nhập thành công!");
+    await laziPage.goto('https://lazi.vn', { waitUntil: 'networkidle2', timeout: 60000 });
+    console.log("-> Đăng nhập Lazi thành công!");
 
-    await injectScanner(page);
+    await injectScanner(laziPage, qbPage);
 
-    const TOTAL_RUN_TIME = 21300000;
+    // Thời gian chạy 5 tiếng 40 phút (để tránh bị GitHub tự ngắt ở mốc 6 tiếng)
+    const TOTAL_RUN_TIME = 20400000; 
     const CHECK_INTERVAL = 10000;
     const RELOAD_INTERVAL = 3600000;
     
     let timeElapsed = 0;
     let timeSinceLastReload = 0;
 
-    console.log(`[Hệ thống] Bot dự kiến chạy trong ${TOTAL_RUN_TIME / 60000} phút. Sẽ tự động F5 sau mỗi 60 phút.`);
+    console.log(`[Hệ thống] Bot bắt đầu treo cày. Tự động reload mỗi 60 phút...`);
 
     while (timeElapsed < TOTAL_RUN_TIME) {
         await new Promise(resolve => setTimeout(resolve, CHECK_INTERVAL));
@@ -229,31 +246,26 @@ async function injectScanner(page) {
         timeSinceLastReload += CHECK_INTERVAL;
 
         if (timeSinceLastReload >= RELOAD_INTERVAL) {
-            console.log("\n[Hệ thống] Đã chạy tròn 1 tiếng! Đang tiến hành làm mới (Reload) trang Lazi...");
+            console.log("\n[Hệ thống] Reload Lazi & QuillBot để giải phóng RAM...");
             try {
-                for (const ck of LAZI_COOKIES) {
-                    await page.setCookie(ck);
-                }
-                await page.reload({ waitUntil: 'networkidle2' });
-                console.log("[Hệ thống] Đã làm mới trang Lazi thành công.");
-                
-                await injectScanner(page);
-                
+                await laziPage.reload({ waitUntil: 'networkidle2' });
+                await qbPage.reload({ waitUntil: 'domcontentloaded' });
+                await injectScanner(laziPage, qbPage);
                 timeSinceLastReload = 0;
             } catch (reloadErr) {
-                console.error("[Hệ thống Lỗi] Không thể reload trang, giữ nguyên phiên chạy cũ:", reloadErr.message);
+                console.error("[Lỗi Reload]:", reloadErr.message);
             }
         }
     }
     
-    console.log("=== SẮP HẾT GIỚI HẠN! TIẾN HÀNH KÍCH HOẠT PHIÊN MỚI GỐI ĐẦU ===");
+    console.log("=== SẮP HẾT 6 TIẾNG! TIẾN HÀNH KÍCH HOẠT WORKFLOW MỚI GỐI ĐẦU ===");
     
     try {
         const { execSync } = require('child_process');
-        execSync('gh workflow run treoweb.yml', { stdio: 'inherit' });
-        console.log("-> Kích hoạt phiên mới thành công! Phiên cũ chuẩn bị rút lui an toàn.");
+        execSync('gh workflow run "Sieu Bot Diet Lazi Rep Chat Bang QuillBot"', { stdio: 'inherit' });
+        console.log("-> Kích hoạt phiên GitHub Actions mới thành công!");
     } catch (err) {
-        console.error("Lỗi nghiêm trọng khi gọi phiên mới:", err.message);
+        console.error("Lỗi khi tự kích hoạt workflow mới:", err.message);
     }
 
     await browser.close();
