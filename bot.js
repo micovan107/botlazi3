@@ -1,82 +1,120 @@
 const puppeteer = require('puppeteer-core');
+const axios = require('axios');
 
-const QUILLBOT_COOKIE = "abIDV2=492; _sp_ses.48cd=*; anonID=746e9178b57158d9; authenticated=false; premium=false; acceptedPremiumModesTnc=false; g_state={\"i_l\":0,\"i_ll\":1780744047776,\"i_b\":\"xmXnUoDTgPIl6ZZ+6e1JM2RI7bQ/yopAxaDotff/TOM\",\"i_e\":{\"enable_itp_optimization\":0},\"i_et\":1780744047770}; qdid=42efbd8009479e3ba4f5b3de2f36f505; connect.sid=s:_dHwC5cmuvC6tiaj8cSyrlWA7FdXdeo4.RlHPJOlT+GQQqSkZsIHlpcVyDqDHoMbY4mDoHmUry74; qb_anon_id=ea5e281f716950dae2176e6fe4ab79e01ec79de4b955e8868855c9a4dd80a962.8c83e63fac14f43253e54344390150552ca554a0b424d4e394163b97e07af70c; __cf_bm=D8YuS6xW4V_kQdhsb4ML.SB4TeT46YGfH3VwZdbovx8-1780744050.3231413-1.0.1.1-NobpSYvCP2IrTyt8huQ1qtkRsMdd2hr9buaVewHiCcC7SVO8y.FkdFb1K8r0PTxu4ETka6N_WgTK8K0PCzvcF6A5.3C_9oMXw93lcq0HFEFr6m8L_Yab3VdQNbn26Smq; AMP_MKTG_6e403e775d=%7B%22referrer%22%3A%22https%3A%2F%2Fwww.google.com%2F%22%2C%22referring_domain%22%3A%22www.google.com%22%7D; qbDeviceId=b2ec739d-e195-454f-81bb-a63786a781d9; cl_val=43; _gcl_au=1.1.1557228843.1780744049; OptanonConsent=isGpcEnabled=0&datestamp=Sat+Jun+06+2026+18%3A07%3A29+GMT%2B0700+(Gi%E1%BB%9D+%C4%90%C3%B4ng+D%C6%B0%C6%A1ng)&version=202605.1.0&browserGpcFlag=0&isDntEnabled=0&isIABGlobal=false&hosts=&landingPath=https%3A%2F%2Fquillbot.com%2Fai-chat&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CC0004%3A1%2CC0005%3A1; _ga=GA1.1.605710320.1780744050; FPID=FPID2.2.Dc9CYf2pr0fruo44EI+XnQz/vO9RkRUHcL3ww1t5xD4=.1780744050; FPLC=Fy8dOynxtOP6HdK7DxgdWFYvHQrDZ+dWLHrkBNcPE7yaWknvxrN+nzBPq8p27tiOVpCirhSVEIdj6XaDzD1/pMmoMauZrs+6J+1zsGCj1X+FiwQRU632uLgWvxBR8w==; FPAU=1.1.1557228843.1780744049; _clck=apdfri^2^g6o^0^2348; _clsk=1ddbi5m^1780744052215^1^0^t.clarity.ms/collect; _ga_D39F2PYGLM=GS2.1.s1780744049$o1$g1$t1780744052$j57$l0$h46958804; _uetsid=e8c43540619711f180111fdc8566318e; _uetvid=e8c485a0619711f1ae02d5451160de39; theme=dark; AMP_6e403e775d=%7B%22deviceId%22%3A%22b2ec739d-e195-454f-81bb-a63786a781d9%22%2C%22sessionId%22%3A1780744048890%2C%22optOut%22%3Afalse%2C%22lastEventTime%22%3A1780744180487%2C%22lastEventId%22%3A25%2C%22pageCounter%22%3A0%2C%22cookieDomain%22%3A%22.quillbot.com%22%7D; _sp_id.48cd=8a7e9aef-10e7-48d0-9588-819bed3fcb00.1780744047.1.1780744181..e01b7da6-3146-4b61-be9f-8ade984daf4c..bfcce7bd-c15b-402f-9e8f-c4b7057ea4f9.1780744048898.16";
+// Cookie dự phòng ban đầu
+const INITIAL_QUILLBOT_COOKIE = "abIDV2=492; _sp_ses.48cd=*; anonID=746e9178b57158d9; authenticated=false; premium=false; acceptedPremiumModesTnc=false; g_state={\"i_l\":0,\"i_ll\":1780744047776,\"i_b\":\"xmXnUoDTgPIl6ZZ+6e1JM2RI7bQ/yopAxaDotff/TOM\",\"i_e\":{\"enable_itp_optimization\":0},\"i_et\":1780744047770}; qdid=42efbd8009479e3ba4f5b3de2f36f505; connect.sid=s:_dHwC5cmuvC6tiaj8cSyrlWA7FdXdeo4.RlHPJOlT+GQQqSkZsIHlpcVyDqDHoMbY4mDoHmUry74; qb_anon_id=ea5e281f716950dae2176e6fe4ab79e01ec79de4b955e8868855c9a4dd80a962.8c83e63fac14f43253e54344390150552ca554a0b424d4e394163b97e07af70c; __cf_bm=D8YuS6xW4V_kQdhsb4ML.SB4TeT46YGfH3VwZdbovx8-1780744050.3231413-1.0.1.1-NobpSYvCP2IrTyt8huQ1qtkRsMdd2hr9buaVewHiCcC7SVO8y.FkdFb1K8r0PTxu4ETka6N_WgTK8K0PCzvcF6A5.3C_9oMXw93lcq0HFEFr6m8L_Yab3VdQNbn26Smq; AMP_MKTG_6e403e775d=%7B%22referrer%22%3A%22https%3A%2F%2Fwww.google.com%2F%22%2C%22referring_domain%22%3A%22www.google.com%22%7D; qbDeviceId=b2ec739d-e195-454f-81bb-a63786a781d9; cl_val=43; _gcl_au=1.1.1557228843.1780744049; OptanonConsent=isGpcEnabled=0&datestamp=Sat+Jun+06+2026+18%3A07%3A29+GMT%2B0700+(Gi%E1%BB%9D+%C4%90%C3%B4ng+D%C6%B0%C6%A1ng)&version=202605.1.0&browserGpcFlag=0&isDntEnabled=0&isIABGlobal=false&hosts=&landingPath=https%3A%2F%2Fquillbot.com%2Fai-chat&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CC0004%3A1%2CC0005%3A1; _ga=GA1.1.605710320.1780744050; FPID=FPID2.2.Dc9CYf2pr0fruo44EI+XnQz/vO9RkRUHcL3ww1t5xD4=.1780744050; FPLC=Fy8dOynxtOP6HdK7DxgdWFYvHQrDZ+dWLHrkBNcPE7yaWknvxrN+nzBPq8p27tiOVpCirhSVEIdj6XaDzD1/pMmoMauZrs+6J+1zsGCj1X+FiwQRU632uLgWvxBR8w==; FPAU=1.1.1557228843.1780744049; _clck=apdfri^2^g6o^0^2348; _clsk=1ddbi5m^1780744052215^1^0^t.clarity.ms/collect; _ga_D39F2PYGLM=GS2.1.s1780744049$o1$g1$t1780744052$j57$l0$h46958804; _uetsid=e8c43540619711f180111fdc8566318e; _uetvid=e8c485a0619711f1ae02d5451160de39; theme=dark; AMP_6e403e775d=%7B%22deviceId%22%3A%22b2ec739d-e195-454f-81bb-a63786a781d9%22%2C%22sessionId%22%3A1780744048890%2C%22optOut%22%3Afalse%2C%22lastEventTime%22%3A1780744180487%2C%22lastEventId%22%3A25%2C%22pageCounter%22%3A0%2C%22cookieDomain%22%3A%22.quillbot.com%22%7D; _sp_id.48cd=8a7e9aef-10e7-48d0-9588-819bed3fcb00.1780744047.1.1780744181..e01b7da6-3146-4b61-be9f-8ade984daf4c..bfcce7bd-c15b-402f-9e8f-c4b7057ea4f9.1780744048898.16";
+
+// Lưu trữ Link API và Header động thu thập được
+let activeQuillBotApiUrl = "https://quillbot.com/api/ai-chat/chat/conversation/be6e38e2-1138-43e4-93ee-9af0bea2190a";
+let activeQuillBotHeaders = {
+    "Content-Type": "application/json",
+    "Accept": "text/event-stream",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Platform-Type": "webapp",
+    "Qb-Product": "AI-CHAT",
+    "Cookie": INITIAL_QUILLBOT_COOKIE
+};
 
 const RAW_LAZI_COOKIES = [
-    {"domain": "lazi.vn", "name": "PHPSESSID", "path": "/", "value": "4tj1q77mdspfce67o9f7bm3uc4"},
-    {"domain": ".lazi.vn", "name": "lazi_identity", "path": "/", "value": "4657694"},
-    {"domain": ".lazi.vn", "name": "lazi_remember_code", "path": "/", "value": "4838117af5d22fe39610ee3bc5292138b0b6e919"},
-    {"domain": ".lazi.vn", "name": "lazi_vldu", "path": "/", "value": "2j0dsfabDhwP3cyXjfCw5%2BhXssqG81wugBeO05QCEfGEfkd2dj3c%2BMbHUp2eaeLGmjn%2FBYX4WknALJiCyoAihn1nGa5o2Q%3D%3Domzec2mb5s"},
-    {"domain": ".lazi.vn", "name": "lazi_identity_code", "path": "/", "value": "4657694"},
-    {"domain": ".lazi.vn", "name": "lazi_user_code", "path": "/", "value": "SDo0SyeXdgxuvP00XbFw1bJXwJP6lQwjOwAzH048gS7xvhPRMqX5KaoJB3r5K80TPE%2F6flp3Ai9esP2crjjl3A%3D%3D"},
-    {"domain": ".lazi.vn", "name": "lazi_cms", "path": "/", "value": "H1cTHQcMDYQ%2F%2FY%2BIofx5ndj3kETm8TA4zHZpuBeVgzaUH3mEYGZE9Zyf6xMuXYmNw7YVW8qe%2FJ0Bo5FmqDtx3qU3Nymt9lemE6%2Fym995V7KopWx%2FUAKbr%2FPXZre8HYnovrAr%2B9bysP2OIEnq19yDhudUIjm90xMXtjnJQtkuJx6Udt7vgNGscn1sYMr9Kj6mPC4XhxWH3dfBbI8rqQkTUbchDUooXUug1MtWhFzaGXudJ9rj0QB5vIXNd5WPqthFlsQgvjq%2Bf7Mnu0LIDHBZBAIPPwaDyylmvYYeiwDdHQYtZbNeMxVBVCjkdIhQ3bgAfui6dFUWPsEyePiU7VQs%2B86qqgHZaaugGObY0CMRwehbWw4KmzKwakFoiYDE8qa%2BNTuXprH6GROf4bLYWaFtjMENVZVfR7WxRUITbZ8Sg5KHvWI%2BgTpTzI5s8ZIU7pstfsv4BwPndZne7ZGwShKl7RsRDGSqcR6fnRNdczp8Xk7L%2B1QJAmHZoD%2BAgf0B8yX103S%2BwAsLNpLWf8NDZKMWCeM1U2X%2BuvYAzbK3LBfaCEUNITY%2Bb1uD5Azpan6K0hjQR3DgRlpsNMO37pLaIPnxMMKqFEyUz3Xe27uVnz9kxFO0vuPASySMXl5e1vhu0Pso"}
+  {"domain": "lazi.vn", "name": "PHPSESSID", "path": "/", "value": "kincnah3od5gqtk9rk0fgvevh0"},
+  {"domain": ".lazi.vn", "name": "lazi_identity", "path": "/", "value": "4038338"},
+  {"domain": ".lazi.vn", "name": "lazi_remember_code", "path": "/", "value": "fd291a2019111e7b871694f37b7c801e5395a114"},
+  {"domain": ".lazi.vn", "name": "lazi_vldu", "path": "/", "value": "zdvh9g57ELN6SEA8vGjW3cBYkWXA%2BsbMGphuVZJ4AJVZHgjXlbLW9UAtNsCk7%2BqPuMncus7ZmofdpCoRIp3ehWnyfdBrrg%3D%3D2z9ks57krt"},
+  {"domain": ".lazi.vn", "name": "lazi_identity_code", "path": "/", "value": "4038338"},
+  {"domain": ".lazi.vn", "name": "lazi_user_code", "path": "/", "value": "JLu7jWFQHBI12BALjNVClg0s5E0ZEudFe%2FOn%2FGgWQ%2BVhM5V%2FuJFb7gknddIKNCxJGbUK4cG5PqxQKACMm%2BXaqg%3D%3D"},
+  {"domain": ".lazi.vn", "name": "lazi_cms", "path": "/", "value": "FPKqNZ4G5oAmYWQop246xUI%2BmtdYDVk94nOHwHYNdRQpFnVFGxuugoPW2LfQ9iCoXwlCoZCepy9t2BEs%2FH5GrcY9vvy9f0AoMe6ybkw%2FTUnG2Vsnt1prM0%2FI2PhoYTP9SbYCyFFnkF3LPSPcDQOSgBbFXv6UPo%2FqxpAcV5Zb%2FOn9dU6mFXuQuvK6T3MQuYPZmEzGzARhR1TlJLJqFPLBJ3NTIWhXjighb9DrF5GM5bk4MqeXdt3aeGbutAEtAk2LZbm9MHryVKAqc%2B5Au12qvEChovjn3uMZ5%2FUBSkKYIatY7iTuue9e9dBlWRASHYJNXAiJou5f7gbpA5oevCEWMQNrPqSexlAfBvIlj2AURCRh9PuLt%2Fe42fViv2snyibuVsm%2Bk4y3%2FselIBJy46eStPq0y474FXJSyHCte9p8WQXhT%2F3t3Z9sxdwukESAbCTIp%2BJ9pG0xaIlPB0sdSfRXnSKmvASDRugi1YOEjBkCTHOdWjaIAMNQSeH6Jp0Qr8BqSwP9Prpc2%2F9Yl3uoKSeisnlMHmxJP2I2%2Bw6xVrT5lfCCALWoVv80CWS8iLVj%2FVGrITK8BZHseZEqc8KH1MraUPtVtkVEXc5xcWXuW97kqTQrBGEhrA1%2BszeWj9VQTALx"}
 ];
 
 const LAZI_COOKIES = RAW_LAZI_COOKIES.map(cookie => {
-    if (!cookie.domain) cookie.domain = '.lazi.vn';
+    if (!cookie.domain) {
+        cookie.domain = '.lazi.vn';
+    }
     return cookie;
 });
 
-// Gọi API QuillBot bằng chính Tab QuillBot đang mở
-async function askQuillBot(qbPage, promptText) {
-    try {
-        const result = await qbPage.evaluate(async (prompt) => {
-            try {
-                const response = await fetch("https://quillbot.com/api/ai-chat/chat/conversation/442b5e89-17a0-48e6-bec7-82074acac2ab", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "text/event-stream",
-                        "Platform-Type": "webapp",
-                        "Qb-Product": "AI-CHAT"
-                    },
-                    body: JSON.stringify({
-                        message: { content: prompt + "\n\n" },
-                        context: { editorContext: "", selectionContext: "", userDialect: "en-us", apiVersion: 2 },
-                        origin: { name: "ai-chat.chat", url: "https://quillbot.com" }
-                    })
-                });
-
-                if (!response.ok) {
-                    return { error: `HTTP status ${response.status}` };
-                }
-
-                const rawText = await response.text();
-                
-                const regex = /"content"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
-                let match;
-                let accumulatedContent = "";
-                while ((match = regex.exec(rawText)) !== null) {
-                    try {
-                        accumulatedContent += JSON.parse(`"${match[1]}"`);
-                    } catch (e) {
-                        accumulatedContent += match[1];
-                    }
-                }
-                return { data: accumulatedContent };
-            } catch (err) {
-                return { error: err.message };
-            }
-        }, promptText);
-
-        if (result.error) {
-            console.error("[Lỗi QuillBot Tab]:", result.error);
-            return null;
+function parseStreamText(rawText) {
+    const regex = /"content"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+    let match;
+    let accumulatedContent = "";
+    while ((match = regex.exec(rawText)) !== null) {
+        try {
+            accumulatedContent += JSON.parse(`"${match[1]}"`);
+        } catch (e) {
+            accumulatedContent += match[1];
         }
+    }
+    return accumulatedContent;
+}
 
-        return result.data;
+// Hàm mở tab QuillBot ngầm để "săn" Link API conversation tươi + Cookie/Headers mới nhất
+async function fetchFreshQuillBotConfig(browser) {
+    console.log("[QuillBot Fetcher] Đang khởi tạo tab ngầm để săn Link API tươi...");
+    let qbPage = null;
+    try {
+        qbPage = await browser.newPage();
+        await qbPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        await qbPage.setRequestInterception(true);
+
+        qbPage.on('request', interceptedRequest => {
+            const url = interceptedRequest.url();
+            if (url.includes('/api/ai-chat/chat/conversation/')) {
+                console.log('\n[QuillBot Fetcher] ==> ĐÃ BẮT ĐƯỢC LINK API MỚI:', url);
+                activeQuillBotApiUrl = url;
+                
+                // Lấy toàn bộ headers gửi đi từ browser (chứa Cookie + Auth tươi nhất)
+                const headers = interceptedRequest.headers();
+                activeQuillBotHeaders = {
+                    ...activeQuillBotHeaders,
+                    ...headers,
+                    "Accept": "text/event-stream",
+                    "Content-Type": "application/json"
+                };
+                console.log('[QuillBot Fetcher] ==> Đã cập nhật Cookie & Header mới nhất!\n');
+            }
+            interceptedRequest.continue();
+        });
+
+        await qbPage.goto('https://quillbot.com/ai-chat', { waitUntil: 'networkidle2', timeout: 60000 });
+
+        // Gõ nhẹ 1 chữ mồi để QuillBot tự bắn Request API khởi tạo conversation
+        const inputSelector = 'textarea, div[contenteditable="true"]';
+        await qbPage.waitForSelector(inputSelector, { timeout: 10000 });
+        await qbPage.type(inputSelector, 'Hi');
+        await qbPage.keyboard.press('Enter');
+
+        // Chờ 3 giây để bắt kịp Request
+        await new Promise(r => setTimeout(r, 3000));
     } catch (err) {
-        console.error("[Lỗi Evaluate QuillBot]:", err.message);
+        console.error("[QuillBot Fetcher Lỗi] Không tự vớt được API mới, sẽ dùng config fallback:", err.message);
+    } finally {
+        if (qbPage) await qbPage.close().catch(() => {});
+    }
+}
+
+async function askQuillBot(promptText) {
+    try {
+        const response = await axios.post(
+            activeQuillBotApiUrl,
+            {
+                message: { content: promptText + "\n\n" },
+                context: { editorContext: "", selectionContext: "", userDialect: "en-us", apiVersion: 2 },
+                origin: { name: "ai-chat.chat", url: "https://quillbot.com" }
+            },
+            {
+                headers: activeQuillBotHeaders,
+                responseType: 'text'
+            }
+        );
+        return parseStreamText(response.data);
+    } catch (err) {
+        console.error("Lỗi gọi API QuillBot:", err.message);
         return null;
     }
 }
 
-async function injectScanner(laziPage, qbPage) {
-    console.log("[Hệ thống] Đang kích hoạt bẫy quét dữ liệu Lazi...");
-    await laziPage.evaluate(() => {
-        if (window.__lz_scanner_active) return;
-        window.__lz_scanner_active = true;
-
+async function injectScanner(page) {
+    console.log("[Hệ thống] Đang chích mã Siêu Quét Băng Chuyền vào Browser...");
+    await page.evaluate(() => {
         const lastProcessedMessages = new Map();
 
         function scanAllActiveBoxes() {
@@ -116,93 +154,66 @@ async function injectScanner(laziPage, qbPage) {
                     if (el) contextArray.push(`${sender}: ${el.innerText.trim()}`);
                 });
 
-                if (typeof window.handleNewMessage === 'function') {
-                    window.handleNewMessage(boxId, targetName, contextArray.join('\n'));
-                }
+                window.handleNewMessage(boxId, targetName, contextArray.join('\n'));
             });
         }
 
-        new MutationObserver(() => scanAllActiveBoxes()).observe(document.body, { childList: true, subtree: true });
-        setInterval(() => scanAllActiveBoxes(), 500);
-        console.log("[Browser] Bẫy quét tin nhắn đã sẵn sàng!");
+        new MutationObserver(() => {
+            scanAllActiveBoxes();
+        }).observe(document.body, { childList: true, subtree: true });
+
+        setInterval(() => {
+            scanAllActiveBoxes();
+        }, 500);
+
+        console.log("[Browser] Bẫy quét dọn băng chuyền thời gian thực đã hoạt động trở lại!");
     });
 }
 
 (async () => {
-    console.log("=== HỆ THỐNG BOT LAZI CHẠY TRÊN GITHUB ACTIONS ===");
+    console.log("=== HỆ THỐNG BOT LAZI BẢN SIÊU CẤP TỰ ĐỘNG RELOAD MỖI 1 TIẾNG ===");
     
-    // Cấu hình cờ bypass Cloudflare và CORS cho Chromium
     const browser = await puppeteer.launch({
         executablePath: '/usr/bin/chromium-browser',
         headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-web-security',
-            '--disable-features=IsolateOrigins,site-per-process',
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-        ]
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
-    // 1. MỞ TAB QUILLBOT TRƯỚC VÀ NẠP COOKIE
-    console.log("Đang khởi tạo Tab QuillBot...");
-    const qbPage = await browser.newPage();
+    // Bắt API QuillBot tươi ngay từ lúc chạy
+    await fetchFreshQuillBotConfig(browser);
     
-    // Parse Cookie QuillBot vào Tab QuillBot
-    const cookiePairs = QUILLBOT_COOKIE.split(';');
-    for (let pair of cookiePairs) {
-        const [name, ...val] = pair.trim().split('=');
-        if (name && val) {
-            await qbPage.setCookie({
-                name: name.trim(),
-                value: val.join('=').trim(),
-                domain: '.quillbot.com',
-                path: '/'
-            }).catch(() => {});
-        }
-    }
-    
-    await qbPage.goto('https://quillbot.com/ai-chat', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    console.log("-> Đã mở Tab QuillBot ngầm an toàn!");
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 800 });
 
-    // 2. MỞ TAB LAZI VÀ NẠP COOKIE
-    console.log("Đang khởi tạo Tab Lazi.vn...");
-    const laziPage = await browser.newPage();
-    await laziPage.setViewport({ width: 1280, height: 800 });
-
+    console.log("Đang nạp Cookie định danh Lazi...");
     for (const ck of LAZI_COOKIES) {
-        await laziPage.setCookie(ck);
+        await page.setCookie(ck);
     }
 
-    // Gắn Callback xử lý tin nhắn
-    await laziPage.exposeFunction('handleNewMessage', async (boxId, targetName, contextText) => {
+    console.log("Đang truy cập Lazi.vn...");
+    await page.goto('https://lazi.vn', { waitUntil: 'networkidle2' });
+    console.log("-> Đăng nhập thành công!");
+
+    await page.exposeFunction('handleNewMessage', async (boxId, targetName, contextText) => {
         console.log(`[NodeJS] Nhận tin từ [${targetName}] ở Box ID: ${boxId}. Tiến hành xử lý...`);
         
-        let prompt = `Bạn là một trợ lý AI do Nguyễn Tiến Nam tạo ra, đang nhắn tin trên Lazi với đứa tên là "${targetName}". ` +
-                     `Hãy đóng vai là một người bạn thân, chí cốt. ` +
-                     `Xưng hô gắt gỏng (mày - tao hoặc tao - người ta tùy ngẫu hứng). ` +
-                     `Nói chuyện như một con người thật, biết hờn, dỗi, vui, buồn. ` +
-                     `Không được quá lịch sự, hãy coi người bên kia là thằng bạn cốt không cần giữ thể diện. ` +
-                     `Nếu nó xin tài liệu hay link học tập thì văng cái link ra cho nó kèm một câu khịa gắt.\n\n` +
-                     `Ngữ cảnh cuộc trò chuyện giữa bạn và ${targetName}:\n${contextText}\n\n Thằng bạn:`;
+        let prompt = `Bạn là một trợ lý ảo dikey do Nguyễn Tiến Nam mã hóa vào lazi, đang nhắn tin trực tiếp với một người tên là "${targetName}". ` +
+                     `Hãy nói chuyện có cảm xúc, biết giận, dỗi, hờn như người thật, biết phản bác, biết khịa, và biết phản kháng. ` +
+                     `Nói chuyện dễ nghe, xưng hô phù hợp. Nếu đối phương xin link tài liệu học tập, bạn được phép cung cấp link liên kết đầy đủ và chính xác.\n\n` +
+                     `Ngữ cảnh cuộc trò chuyện giữa bạn và ${targetName}:\n${contextText}\n\nPhản hồi của tôi:`;
         
-        // Gọi AI bằng Tab QuillBot
-        let aiReply = await askQuillBot(qbPage, prompt);
+        let aiReply = await askQuillBot(prompt);
         
         if (aiReply && aiReply.trim()) {
             console.log(`-> Trả lời tự động cho [${targetName}] (Box ${boxId}): ${aiReply.trim()}`);
             
-            await laziPage.evaluate((id, replyText) => {
+            await page.evaluate((id, replyText) => {
                 return new Promise((resolve) => {
                     const textInput = document.getElementById(`lzc_text_${id}`);
                     if (!textInput) return resolve();
 
-                    textInput.focus();
                     textInput.innerText = replyText.trim();
-                    
-                    textInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    textInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    textInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, keyCode: 13 }));
+                    textInput.dispatchEvent(new Event('keyup', { bubbles: true }));
                     
                     if (typeof window.lazi !== 'undefined' && typeof window.lazi.sendButton === 'function') {
                         window.lazi.sendButton(id);
@@ -221,24 +232,20 @@ async function injectScanner(laziPage, qbPage) {
                         resolve();
                     }, 1000);
                 });
-            }, boxId, aiReply).catch(e => console.log("Lỗi gửi tin Lazi:", e.message));
+            }, boxId, aiReply).catch(e => console.log("Lỗi trong quá trình Send/Close Box:", e.message));
         }
     });
 
-    await laziPage.goto('https://lazi.vn', { waitUntil: 'networkidle2', timeout: 60000 });
-    console.log("-> Đăng nhập Lazi thành công!");
+    await injectScanner(page);
 
-    await injectScanner(laziPage, qbPage);
-
-    // Thời gian chạy 5 tiếng 40 phút (để tránh bị GitHub tự ngắt ở mốc 6 tiếng)
-    const TOTAL_RUN_TIME = 20400000; 
+    const TOTAL_RUN_TIME = 21300000;
     const CHECK_INTERVAL = 10000;
     const RELOAD_INTERVAL = 3600000;
     
     let timeElapsed = 0;
     let timeSinceLastReload = 0;
 
-    console.log(`[Hệ thống] Bot bắt đầu treo cày. Tự động reload mỗi 60 phút...`);
+    console.log(`[Hệ thống] Bot dự kiến cày bừa trong ${TOTAL_RUN_TIME / 60000} phút. Sẽ tự động F5 sau mỗi 60 phút.`);
 
     while (timeElapsed < TOTAL_RUN_TIME) {
         await new Promise(resolve => setTimeout(resolve, CHECK_INTERVAL));
@@ -246,26 +253,35 @@ async function injectScanner(laziPage, qbPage) {
         timeSinceLastReload += CHECK_INTERVAL;
 
         if (timeSinceLastReload >= RELOAD_INTERVAL) {
-            console.log("\n[Hệ thống] Reload Lazi & QuillBot để giải phóng RAM...");
+            console.log("\n[Hệ thống] Đã chạy tròn 1 tiếng! Tiến hành làm mới (Reload) Lazi & cập nhật lại API QuillBot...");
             try {
-                await laziPage.reload({ waitUntil: 'networkidle2' });
-                await qbPage.reload({ waitUntil: 'domcontentloaded' });
-                await injectScanner(laziPage, qbPage);
+                // Tải lại API QuillBot tươi mới để tránh bị nghẽn/hết hạn
+                await fetchFreshQuillBotConfig(browser);
+
+                await page.reload({ waitUntil: 'networkidle2' });
+                
+                for (const ck of LAZI_COOKIES) {
+                    await page.setCookie(ck);
+                }
+                console.log("[Hệ thống] Đã làm mới trang Lazi và ép lại Cookie đăng nhập thành công.");
+                
+                await injectScanner(page);
+                
                 timeSinceLastReload = 0;
             } catch (reloadErr) {
-                console.error("[Lỗi Reload]:", reloadErr.message);
+                console.error("[Hệ thống Lỗi] Không thể reload trang, giữ nguyên phiên chạy cũ:", reloadErr.message);
             }
         }
     }
     
-    console.log("=== SẮP HẾT 6 TIẾNG! TIẾN HÀNH KÍCH HOẠT WORKFLOW MỚI GỐI ĐẦU ===");
+    console.log("=== SẮP HẾT 6 TIẾNG GIỚI HẠN! TIẾN HÀNH KÍCH HOẠT PHIÊN MỚI GỐI ĐẦU ===");
     
     try {
         const { execSync } = require('child_process');
-        execSync('gh workflow run "Sieu Bot Diet Lazi Rep Chat Bang QuillBot"', { stdio: 'inherit' });
-        console.log("-> Kích hoạt phiên GitHub Actions mới thành công!");
+        execSync('gh workflow run treoweb.yml', { stdio: 'inherit' });
+        console.log("-> Kích hoạt phiên mới thành công! Phiên cũ chuẩn bị rút lui an toàn.");
     } catch (err) {
-        console.error("Lỗi khi tự kích hoạt workflow mới:", err.message);
+        console.error("Lỗi nghiêm trọng khi gọi phiên mới:", err.message);
     }
 
     await browser.close();
