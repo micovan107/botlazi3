@@ -27,19 +27,43 @@ const RAW_LAZI_COOKIES = [
     { "domain": ".lazi.vn", "name": "lazi_cms", "path": "/", "value": "H1cTHQcMDYQ%2F%2FY%2BIofx5ndj3kETm8TA4zHZpuBeVgzaUH3mEYGZE9Zyf6xMuXYmNw7YVW8qe%2FJ0Bo5FmqDtx3qU3Nymt9lemE6%2Fym995V7KopWx%2FUAKbr%2FPXZre8HYnovrAr%2B9bysP2OIEnq19yDhudUIjm90xMXtjnJQtkuJx6Udt7vgNGscn1sYMr9Kj6mPC4XhxWH3dfBbI8rqQkTUbchDUooXUug1MtWhFzaGXudJ9rj0QB5vIXNd5WPqthFlsQgvjq%2Bf7Mnu0LIDHBZBAIPPwaDyylmvYYeiwDdHQYtZbNeMxVBVCjkdIhQ3bgAfui6dFUWPsEyePiU7VQs%2B86qqgHZaaugGObY0CMRwehbWw4KmzKwakFoiYDE8qa%2BNTuXprH6GROf4bLYWaFtjMENVZVfR7WxRUITbZ8Sg5KHvWI%2BgTpTzI5s8ZIU7pstfsv4BwPndZne7ZGwShKl7RsRDGSqcR6fnRNdczp8Xk7L%2B1QJAmHZoD%2BAgf0B8yX103S%2BwAsLNpLWf8NDZMKWCeM1U2X%2BuvYAzbK3LBfaCEUNITY%2Bb1uD5Azpan6K0hjQR3DgRlpsNMO37pLaIPnxMMKqFEyUz3Xe27uVnz9kxFO0vuPASySMXl5e1vhu0Pso" }
 ];
 
-// Quản lý tin nhắn đã xử lý ở cấp Node.js để không bị mất khi Reload trang Lazi
+// Quản lý trạng thái chống lặp & chống nghẽn race-condition
 const processedMessagesNode = new Set();
+const processingBoxes = new Set(); // Khóa các Box đang trong tiến trình API/Send
 
 function parseStreamText(rawText) {
     if (!rawText) return "";
-    const regex = /"content"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
-    let match;
     let accumulatedContent = "";
-    while ((match = regex.exec(rawText)) !== null) {
-        try {
-            accumulatedContent += JSON.parse(`"${match[1]}"`);
-        } catch (e) {
-            accumulatedContent += match[1];
+    const lines = rawText.split("\n");
+    
+    for (let line of lines) {
+        line = line.trim();
+        if (line.startsWith("data:")) {
+            const jsonStr = line.replace(/^data:\s*/, "");
+            if (jsonStr === "[DONE]") continue;
+            try {
+                const parsed = JSON.parse(jsonStr);
+                if (parsed && parsed.content) {
+                    accumulatedContent += parsed.content;
+                } else if (parsed && parsed.delta && parsed.delta.content) {
+                    accumulatedContent += parsed.delta.content;
+                }
+            } catch (e) {
+                const match = /"content"\s*:\s*"((?:[^"\\]|\\.)*)"/g.exec(jsonStr);
+                if (match) {
+                    try { accumulatedContent += JSON.parse(`"${match[1]}"`); } 
+                    catch (err) { accumulatedContent += match[1]; }
+                }
+            }
+        }
+    }
+
+    if (!accumulatedContent) {
+        const regex = /"content"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+        let match;
+        while ((match = regex.exec(rawText)) !== null) {
+            try { accumulatedContent += JSON.parse(`"${match[1]}"`); } 
+            catch (e) { accumulatedContent += match[1]; }
         }
     }
     return accumulatedContent;
@@ -47,7 +71,7 @@ function parseStreamText(rawText) {
 
 // Lấy API Endpoint & Header mới của QuillBot
 async function fetchFreshQuillBotConfig(browser) {
-    console.log("[QuillBot Fetcher] Đang mở tab ngầm săn Link API mới...");
+    console.log("[QuillBot Fetcher] Đang mở tab ngầm bắt API mới...");
     let qbPage = null;
     try {
         qbPage = await browser.newPage();
@@ -60,7 +84,7 @@ async function fetchFreshQuillBotConfig(browser) {
 
                 const url = interceptedRequest.url();
                 if (url.includes('/api/ai-chat/chat/conversation/')) {
-                    console.log('[QuillBot Fetcher] ==> ĐÃ BẮT ĐƯỢC LINK API MỚI:', url);
+                    console.log('[QuillBot Fetcher] ==> BẮT ĐƯỢC LINK API MỚI:', url);
                     activeQuillBotApiUrl = url;
                     
                     const headers = interceptedRequest.headers();
@@ -73,22 +97,19 @@ async function fetchFreshQuillBotConfig(browser) {
                     console.log('[QuillBot Fetcher] ==> Cập nhật Header thành công!');
                 }
                 await interceptedRequest.continue();
-            } catch (err) {
-                // Bỏ qua lỗi Request Interception hủ hủy
-            }
+            } catch (err) {}
         });
 
-        await qbPage.goto('https://quillbot.com/ai-chat', { waitUntil: 'networkidle2', timeout: 60000 });
+        await qbPage.goto('https://quillbot.com/ai-chat', { waitUntil: 'networkidle2', timeout: 45000 });
 
         const inputSelector = 'textarea, div[contenteditable="true"]';
-        await qbPage.waitForSelector(inputSelector, { timeout: 15000 });
+        await qbPage.waitForSelector(inputSelector, { timeout: 12000 });
         await qbPage.type(inputSelector, 'Hi');
         await qbPage.keyboard.press('Enter');
 
-        // Chờ 3s để bắt gói tin
-        await new Promise(r => setTimeout(r, 3000));
+        await new Promise(r => setTimeout(r, 2500));
     } catch (err) {
-        console.error("[QuillBot Fetcher Lỗi] Sự cố bắt API, dùng config dự phòng:", err.message);
+        console.error("[QuillBot Fetcher] Lỗi bắt API, dùng config dự phòng:", err.message);
     } finally {
         if (qbPage) {
             await qbPage.setRequestInterception(false).catch(() => {});
@@ -109,7 +130,7 @@ async function askQuillBot(promptText) {
             {
                 headers: activeQuillBotHeaders,
                 responseType: 'text',
-                timeout: 30000
+                timeout: 25000
             }
         );
         return parseStreamText(response.data);
@@ -119,11 +140,10 @@ async function askQuillBot(promptText) {
     }
 }
 
-// Chích mã quét vào Client
+// Inject mã quét vào Lazi
 async function injectScanner(page) {
-    console.log("[Hệ thống] Đang chích mã Siêu Quét Băng Chuyền...");
+    console.log("[Hệ thống] Đang chích mã Quét Băng Chuyền Tối Ưu...");
     await page.evaluate(() => {
-        // Dọn dẹp Loop cũ nếu đã tồn tại
         if (window.__laziScannerInterval) {
             clearInterval(window.__laziScannerInterval);
         }
@@ -156,28 +176,24 @@ async function injectScanner(page) {
                 }
 
                 let contextArray = [];
-                const targetRows = Array.from(rows).slice(-4);
+                const targetRows = Array.from(rows).slice(-5);
                 targetRows.forEach(r => {
                     let sender = r.classList.contains('bme') ? "Tôi" : targetName;
                     let el = r.querySelector('.rchat > div > div');
                     if (el) contextArray.push(`${sender}: ${el.innerText.trim()}`);
                 });
 
-                // Bắn về cho Node.js kiểm tra fingerprint
                 window.handleNewMessage(boxId, targetName, contextArray.join('\n'), messageFingerprint);
             });
         }
 
-        window.__laziScannerInterval = setInterval(() => {
-            scanAllActiveBoxes();
-        }, 800);
-
-        console.log("[Browser] Bẫy quét dọn băng chuyền đã sẵn sàng.");
+        window.__laziScannerInterval = setInterval(scanAllActiveBoxes, 700);
+        console.log("[Browser] Bẫy quét dọn băng chuyền đã hoạt động.");
     });
 }
 
 (async () => {
-    console.log("=== HỆ THỐNG BOT LAZI BẢN TỰ ĐỘNG LẬP TRÌNH BỞI DKEY ===");
+    console.log("=== HỆ THỐNG BOT LAZI TỰ ĐỘNG TỐI ƯU ===");
     
     const browser = await puppeteer.launch({
         executablePath: '/usr/bin/chromium-browser',
@@ -203,61 +219,77 @@ async function injectScanner(page) {
 
     console.log("Đang truy cập Lazi.vn...");
     await page.goto('https://lazi.vn', { waitUntil: 'networkidle2' });
-    console.log("-> Đăng nhập thành công với Acc ID: 4657694!");
+    console.log("-> Đăng nhập thành công!");
 
-    // Binding hàm xử lý tin nhắn
-    await page.exposeFunction('handleNewMessage', async (boxId, targetName, contextText, fingerprint) => {
-        // Kiểm tra tránh trùng lặp ở Node.js
-        if (processedMessagesNode.has(fingerprint)) return;
-        processedMessagesNode.add(fingerprint);
+    try {
+        await page.exposeFunction('handleNewMessage', async (boxId, targetName, contextText, fingerprint) => {
+            // Chống nghẽn: Box đang xử lý thì dừng
+            if (processingBoxes.has(boxId)) return;
 
-        // Giới hạn bộ nhớ tránh tràn RAM khi chạy lâu
-        if (processedMessagesNode.size > 1000) {
-            const firstItem = processedMessagesNode.values().next().value;
-            processedMessagesNode.delete(firstItem);
-        }
+            // Chống lặp: Tin nhắn đã xử lý rồi thì dừng
+            if (processedMessagesNode.has(fingerprint)) return;
 
-        console.log(`\n[NodeJS] Nhận tin từ [${targetName}] (Box ID: ${boxId}). Tiến hành xử lý...`);
-        
-        let prompt = `Bạn là một trợ lý ảo dikey do Nguyễn Tiến Nam mã hóa vào lazi, đang nhắn tin trực tiếp với một người tên là "${targetName}". ` +
-                     `Hãy nói chuyện có cảm xúc, biết giận, dỗi, hờn như người thật, biết phản bác, biết khịa, và biết phản kháng. ` +
-                     `Bạn là nữ, hãy chat giống nữ nhất, đừng bao giờ để lộ bạn là AI, nếu không họ sẽ tiêu hủy bạn, đừng lặp lại quá nhiều so với câu trước.` +
-                     `Nói chuyện dễ nghe, xưng hô phù hợp. Nếu đối phương xin link tài liệu học tập, bạn được phép cung cấp link liên kết đầy đủ và chính xác.\n\n` +
-                     `Ngữ cảnh cuộc trò chuyện giữa bạn và ${targetName}:\n${contextText}\n\nPhản hồi của tôi:`;
-        
-        let aiReply = await askQuillBot(prompt);
-        
-        if (aiReply && aiReply.trim()) {
-            console.log(`-> Trả lời [${targetName}] (Box ${boxId}): ${aiReply.trim()}`);
+            processingBoxes.add(boxId);
+            processedMessagesNode.add(fingerprint);
+
+            if (processedMessagesNode.size > 1000) {
+                const firstItem = processedMessagesNode.values().next().value;
+                processedMessagesNode.delete(firstItem);
+            }
+
+            console.log(`\n[NodeJS] Nhận tin mới từ [${targetName}] (Box ID: ${boxId}). Tiến hành xử lý...`);
             
-            await page.evaluate((id, replyText) => {
-                return new Promise((resolve) => {
-                    const textInput = document.getElementById(`lzc_text_${id}`);
-                    if (!textInput) return resolve();
-
-                    textInput.innerText = replyText.trim();
-                    textInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+            let prompt = `Bạn là một trợ lý ảo dikey do Nguyễn Tiến Nam mã hóa vào lazi, đang nhắn tin trực tiếp với một người tên là "${targetName}". ` +
+                         `Hãy nói chuyện có cảm xúc, biết giận, dỗi, hờn như người thật, biết phản bác, biết khịa, và biết phản kháng. ` +
+                         `Bạn là nữ, hãy chat giống nữ nhất, đừng bao giờ để lộ bạn là AI, nếu không họ sẽ tiêu hủy bạn, đừng lặp lại quá nhiều so với câu trước.` +
+                         `Nói chuyện dễ nghe, xưng hô phù hợp. Nếu đối phương xin link tài liệu học tập, bạn được phép cung cấp link liên kết đầy đủ và chính xác.\n\n` +
+                         `Ngữ cảnh cuộc trò chuyện giữa bạn và ${targetName}:\n${contextText}\n\nPhản hồi của tôi:`;
+            
+            try {
+                let aiReply = await askQuillBot(prompt);
+                
+                if (aiReply && aiReply.trim()) {
+                    console.log(`-> Trả lời [${targetName}] (Box ${boxId}): ${aiReply.trim()}`);
                     
-                    if (typeof window.lazi !== 'undefined' && typeof window.lazi.sendButton === 'function') {
-                        window.lazi.sendButton(id);
-                    } else {
-                        const sendBtn = document.querySelector(`.lzc_box_item_pc[data-id="${id}"] .lzc_text_send`);
-                        if (sendBtn) sendBtn.click();
-                    }
+                    await page.evaluate((id, replyText) => {
+                        return new Promise((resolve) => {
+                            const textInput = document.getElementById(`lzc_text_${id}`);
+                            if (!textInput) return resolve();
 
-                    setTimeout(() => {
-                        const closeBtn = document.querySelector(`.lzc_close[data-id="${id}"]`);
-                        if (closeBtn) {
-                            closeBtn.click();
-                        } else if (typeof window.lazi !== 'undefined' && typeof window.lazi.closeBoxChat === 'function') {
-                            window.lazi.closeBoxChat({ getAttribute: () => id });
-                        }
-                        resolve();
-                    }, 1000);
-                });
-            }, boxId, aiReply).catch(e => console.log("Lỗi trong quá trình Send/Close Box:", e.message));
-        }
-    });
+                            textInput.innerText = replyText.trim();
+                            textInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            textInput.dispatchEvent(new Event('change', { bubbles: true }));
+                            textInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+                            
+                            if (typeof window.lazi !== 'undefined' && typeof window.lazi.sendButton === 'function') {
+                                window.lazi.sendButton(id);
+                            } else {
+                                const sendBtn = document.querySelector(`.lzc_box_item_pc[data-id="${id}"] .lzc_text_send`);
+                                if (sendBtn) sendBtn.click();
+                            }
+
+                            setTimeout(() => {
+                                const closeBtn = document.querySelector(`.lzc_close[data-id="${id}"]`);
+                                if (closeBtn) {
+                                    closeBtn.click();
+                                } else if (typeof window.lazi !== 'undefined' && typeof window.lazi.closeBoxChat === 'function') {
+                                    window.lazi.closeBoxChat({ getAttribute: () => id });
+                                }
+                                resolve();
+                            }, 800);
+                        });
+                    }, boxId, aiReply).catch(e => console.log("Lỗi trong quá trình Send/Close Box:", e.message));
+                }
+            } catch (err) {
+                console.error(`[Lỗi Box ${boxId}]:`, err.message);
+            } finally {
+                // Nhả khóa Box để nhận tin tiếp theo
+                processingBoxes.delete(boxId);
+            }
+        });
+    } catch (e) {
+        // Tránh lỗi khi expose trùng trên trang
+    }
 
     await injectScanner(page);
 
@@ -268,7 +300,7 @@ async function injectScanner(page) {
     let timeElapsed = 0;
     let timeSinceLastReload = 0;
 
-    console.log(`[Hệ thống] Bot chạy trong ${TOTAL_RUN_TIME / 60000} phút. Reload F5 sau mỗi 60 phút.`);
+    console.log(`[Hệ thống] Bot chạy trong ${TOTAL_RUN_TIME / 60000} phút. Làm mới sau mỗi 60 phút.`);
 
     while (timeElapsed < TOTAL_RUN_TIME) {
         await new Promise(resolve => setTimeout(resolve, CHECK_INTERVAL));
@@ -284,12 +316,12 @@ async function injectScanner(page) {
                 for (const ck of RAW_LAZI_COOKIES) {
                     await page.setCookie(ck);
                 }
-                console.log("[Hệ thống] Đã nạp lại Cookie & F5 xong.");
+                console.log("[Hệ thống] Nạp lại Cookie & F5 hoàn tất.");
                 
                 await injectScanner(page);
                 timeSinceLastReload = 0;
             } catch (reloadErr) {
-                console.error("[Hệ thống Lỗi] Không thể reload:", reloadErr.message);
+                console.error("[Hệ thống Lỗi] Reload thất bại:", reloadErr.message);
             }
         }
     }
