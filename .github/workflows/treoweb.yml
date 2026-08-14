@@ -7,7 +7,7 @@ permissions: write-all # Quyền tối cao để con Bot tự ra lệnh bật ph
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 300 # Nâng lên 6 tiếng (mức trần của GitHub) để Bot cày được lâu nhất
+    timeout-minutes: 360 # Nâng lên 6 tiếng (mức trần của GitHub) để Bot cày được lâu nhất
 
     steps:
     - name: Checkout code
