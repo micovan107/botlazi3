@@ -1,26 +1,42 @@
 name: Sieu Bot Diet Lazi Rep Chat Bang QuillBot
 on:
-  workflow_dispatch: # Ông bấm nút kích hoạt phát súng đầu tiên, từ sau Bot tự gọi nhau
+  workflow_dispatch: # Bật phát đầu, sau bot tự gọi nhau
 
-permissions: write-all # Quyền tối cao để con Bot tự ra lệnh bật phiên mới cho chính nó
+permissions: write-all
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 360 # Nâng lên 6 tiếng (mức trần của GitHub) để Bot cày được lâu nhất
+    timeout-minutes: 360
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Cài đặt môi trường NodeJS và Chrome xịn
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    # 1. Tự khôi phục Cache (Node modules & Chrome) nếu đã có
+    - name: Cache Node Modules & Chrome
+      uses: actions/cache@v4
+      id: global-cache
+      with:
+        path: |
+          ~/.npm
+          ~/.cache/puppeteer
+          node_modules
+        key: ${{ runner.os }}-bot-deps-${{ hashFiles('package.json') }}
+
+    # 2. Nếu chưa có Cache thì mới tự động cài đặt và tải tài nguyên
+    - name: Install Dependencies & Chrome Binary
+      if: steps.global-cache.outputs.cache-hit != 'true'
       run: |
-        sudo apt-get update
-        sudo apt-get install -y chromium-browser
-        npm install puppeteer-core axios form-data
-        
+        npm install puppeteer axios form-data
+        npx puppeteer browsers install chrome
+
     - name: Khoi chay he thong AI rep chat tu dong
       run: node bot.js
       env:
-        GH_TOKEN: ${{ github.token }} # Bơm Token bảo mật đặt đúng vị trí để lệnh tự gối đầu chạy được
-        
+        GH_TOKEN: ${{ github.token }}
