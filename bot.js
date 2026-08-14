@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer-core');
+const puppeteer = require('puppeteer');
 const axios = require('axios');
 const { execSync } = require('child_process');
 
@@ -196,7 +196,6 @@ async function injectScanner(page) {
     console.log("=== HỆ THỐNG BOT LAZI TỰ ĐỘNG TỐI ƯU ===");
     
     const browser = await puppeteer.launch({
-        executablePath: '/usr/bin/chromium-browser',
         headless: 'new',
         args: [
             '--no-sandbox',
