@@ -77,22 +77,23 @@ function formatCookies(cookies) {
     });
 }
 
-// Upload ảnh chụp màn hình lên ImgBB
+// Upload ảnh chụp màn hình lên ImgBB (Đã sửa truyền ReadStream chuẩn multipart)
 async function uploadToImgBB(filePath) {
     try {
         if (!fs.existsSync(filePath)) {
             log('WARN', `File ảnh không tồn tại để upload: ${filePath}`);
             return null;
         }
-        const fileData = fs.readFileSync(filePath, { encoding: 'base64' });
-        
+
         const form = new FormData();
-        form.append('image', fileData);
+        form.append('image', fs.createReadStream(filePath));
 
         const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
             method: 'POST',
-            body: form
+            body: form,
+            headers: form.getHeaders()
         });
+
         const json = await res.json();
         if (json && json.data && json.data.url) {
             return json.data.url;
@@ -156,7 +157,8 @@ async function translateToVietnamese(text) {
 
 async function askSpicyChat(spicyPage, laziPage, promptText) {
     try {
-        const inputSelector = 'textarea, div[contenteditable="true"], [placeholder*="Message"], [placeholder*="message"]';
+        // Mở rộng selector bao phủ giao diện SpicyChat
+        const inputSelector = 'textarea, div[contenteditable="true"], [placeholder*="Message"], [placeholder*="message"], #chat-input';
         
         log('DEBUG', '[SpicyChat] Tìm kiếm selector ô nhập liệu...');
         await spicyPage.waitForSelector(inputSelector, { visible: true, timeout: 20000 }).catch(async (err) => {
