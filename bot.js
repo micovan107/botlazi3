@@ -1,6 +1,5 @@
 const puppeteer = require('puppeteer');
 const { execSync } = require('child_process');
-const fs = require('fs');
 
 // Link SpicyChat
 const SPICYCHAT_URL = "https://spicychat.ai/chat/134a8d8c-334d-4a45-8677-5fc00b76f58c/f901a5ef-3036-4fae-8669-941f2ef3f51e";
@@ -50,10 +49,11 @@ async function askSpicyChat(spicyPage, promptText) {
         }
 
         if (!inputSelector) {
-            console.error("❌ Không tìm thấy textarea! Đang lưu HTML trang...");
+            console.error("❌ Không tìm thấy textarea SpicyChat!");
             const htmlContent = await spicyPage.content();
-            fs.writeFileSync('spicychat_dump.html', htmlContent);
-            console.log("-> Đã ghi file spicychat_dump.html");
+            console.log("=== HTML DUMP SPICYCHAT ===");
+            console.log(htmlContent);
+            console.log("=== END HTML DUMP ===");
             return null;
         }
 
