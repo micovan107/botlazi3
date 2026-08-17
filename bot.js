@@ -83,26 +83,35 @@ async function askSpicyChat(spicyPage, promptText) {
         const inputSelector = 'textarea';
         await spicyPage.waitForSelector(inputSelector, { timeout: 15000 });
 
-        await spicyPage.evaluate((text, selector) => {
-            const textarea = document.querySelector(selector);
-            if (!textarea) return;
-            
-            const nativeTextareaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
-            nativeTextareaValueSetter.call(textarea, text);
-
-            textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            textarea.dispatchEvent(new Event('change', { bubbles: true }));
-        }, promptText, inputSelector);
-
-        await new Promise(r => setTimeout(r, 500));
-        await spicyPage.keyboard.press('Enter');
-
-        await spicyPage.evaluate(() => {
-            const btn = document.querySelector('button[type="submit"]') || document.querySelector('button:has(svg)');
-            if (btn) btn.click();
+        // Đếm số lượng tin nhắn hiện tại để biết khi nào AI nhả tin nhắn mới
+        const initialMsgCount = await spicyPage.evaluate(() => {
+            return document.querySelectorAll('div[class*="message"], div[class*="chat-bubble"], .prose').length;
         });
 
-        console.log("[SpicyChat] Đã đẩy prompt, chờ AI sinh văn bản...");
+        // Click focus vào ô chat
+        await spicyPage.click(inputSelector);
+        
+        // Clear sạch dữ liệu cũ trong textarea nếu có
+        await spicyPage.evaluate((selector) => {
+            const el = document.querySelector(selector);
+            if (el) el.value = '';
+        }, inputSelector);
+
+        // Gõ nội dung (Sử dụng type để trigger React State)
+        await spicyPage.type(inputSelector, promptText, { delay: 5 });
+
+        await new Promise(r => setTimeout(r, 300));
+
+        // Nhấn Enter để gửi
+        await spicyPage.keyboard.press('Enter');
+
+        // Bổ sung: Click nút submit nếu Enter chưa gửi được
+        await spicyPage.evaluate(() => {
+            const btn = document.querySelector('button[type="submit"]') || document.querySelector('button:has(svg)');
+            if (btn && !btn.disabled) btn.click();
+        });
+
+        console.log("[SpicyChat] Đã gửi prompt thành công, chờ AI rep...");
 
         let lastText = "";
         let stableCount = 0;
@@ -113,12 +122,14 @@ async function askSpicyChat(spicyPage, promptText) {
             await new Promise(r => setTimeout(r, 1000));
             retry++;
 
-            const currentText = await spicyPage.evaluate(() => {
+            const currentText = await spicyPage.evaluate((initCount) => {
                 const msgNodes = document.querySelectorAll('div[class*="message"], div[class*="chat-bubble"], .prose');
-                if (msgNodes.length === 0) return null;
+                // Nếu chưa có tin nhắn mới xuất hiện thì đợi tiếp
+                if (msgNodes.length <= initCount) return null;
+                
                 const lastNode = msgNodes[msgNodes.length - 1];
                 return lastNode ? lastNode.innerText.trim() : null;
-            });
+            }, initialMsgCount);
 
             if (currentText && currentText === lastText && currentText.length > 0) {
                 stableCount++;
