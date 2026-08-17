@@ -27,13 +27,13 @@ jobs:
           ~/.npm
           ~/.cache/puppeteer
           node_modules
-        key: ${{ runner.os }}-bot-deps-v2-${{ hashFiles('package.json') }}
+        key: ${{ runner.os }}-bot-deps-${{ hashFiles('package.json') }}
 
-    # 2. Bổ sung puppeteer-extra và puppeteer-extra-plugin-stealth vào lệnh cài
+    # 2. Nếu chưa có Cache thì mới tự động cài đặt và tải tài nguyên
     - name: Install Dependencies & Chrome Binary
       if: steps.global-cache.outputs.cache-hit != 'true'
       run: |
-        npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth axios form-data
+        npm install puppeteer axios form-data
         npx puppeteer browsers install chrome
 
     - name: Khoi chay he thong AI rep chat tu dong
