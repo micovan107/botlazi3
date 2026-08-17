@@ -1,17 +1,22 @@
 const { execSync } = require('child_process');
+const fs = require('fs');
 
-// Tự động kiểm tra và cài đặt thư viện thiếu để hợp nhất với workflow YAML
+// Tự động kiểm tra và cài đặt thư viện thiếu
 try {
     require.resolve('puppeteer-extra');
     require.resolve('puppeteer-extra-plugin-stealth');
+    require.resolve('form-data');
 } catch (e) {
-    console.log("[Hệ thống] Phát hiện thiếu puppeteer-extra, đang tự động cài đặt...");
-    execSync('npm install puppeteer-extra puppeteer-extra-plugin-stealth --no-save', { stdio: 'inherit' });
+    console.log("[Hệ thống] Phát hiện thiếu thư viện, đang tự động cài đặt...");
+    execSync('npm install puppeteer-extra puppeteer-extra-plugin-stealth form-data --no-save', { stdio: 'inherit' });
 }
 
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const FormData = require('form-data');
 puppeteer.use(StealthPlugin());
+
+const IMGBB_API_KEY = '6013a04256e0c8dcdc6bcae78748f8f4';
 
 // Cookie Lazi
 const RAW_LAZI_COOKIES = [
@@ -41,7 +46,6 @@ const RAW_SPICYCHAT_DATA = {
 const processedMessagesNode = new Set();
 const processingBoxes = new Set();
 
-// Format lại cookie SpicyChat cho khớp chuẩn Puppeteer
 function formatCookies(cookies) {
     return cookies.map(c => {
         let ck = {
@@ -59,7 +63,55 @@ function formatCookies(cookies) {
     });
 }
 
-// Hàm dịch tự động dùng Google Translate API public
+// Hàm upload ảnh chụp màn hình lên ImgBB
+async function uploadToImgBB(filePath) {
+    try {
+        if (!fs.existsSync(filePath)) return null;
+        const fileData = fs.readFileSync(filePath, { encoding: 'base64' });
+        
+        const form = new FormData();
+        form.append('image', fileData);
+
+        const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+            method: 'POST',
+            body: form
+        });
+        const json = await res.json();
+        if (json && json.data && json.data.url) {
+            return json.data.url;
+        }
+        return null;
+    } catch (err) {
+        console.error("[ImgBB] Lỗi upload:", err.message);
+        return null;
+    }
+}
+
+// Chụp và up ảnh màn hình cả 2 bên khi gặp lỗi
+async function captureAndUploadDebug(spicyPage, laziPage, prefix = "error") {
+    console.log(`[Debug] Đang chụp màn hình cả 2 bên (${prefix})...`);
+    const time = Date.now();
+    const fileSpicy = `spicy_${prefix}_${time}.png`;
+    const fileLazi = `lazi_${prefix}_${time}.png`;
+
+    try {
+        if (spicyPage) await spicyPage.screenshot({ path: fileSpicy, fullPage: true });
+        if (laziPage) await laziPage.screenshot({ path: fileLazi, fullPage: true });
+
+        const urlSpicy = await uploadToImgBB(fileSpicy);
+        const urlLazi = await uploadToImgBB(fileLazi);
+
+        console.log(`📸 Ảnh SpicyChat: ${urlSpicy || 'Tạo file lỗi/Upload thất bại'}`);
+        console.log(`📸 Ảnh Lazi: ${urlLazi || 'Tạo file lỗi/Upload thất bại'}`);
+
+        // Xóa file tạm local
+        if (fs.existsSync(fileSpicy)) fs.unlinkSync(fileSpicy);
+        if (fs.existsSync(fileLazi)) fs.unlinkSync(fileLazi);
+    } catch (e) {
+        console.error("[Debug] Lỗi trong quá trình chụp/up ảnh:", e.message);
+    }
+}
+
 async function translateToVietnamese(text) {
     if (!text || !text.trim()) return text;
     try {
@@ -78,36 +130,41 @@ async function translateToVietnamese(text) {
     }
 }
 
-async function askSpicyChat(spicyPage, promptText) {
+async function askSpicyChat(spicyPage, laziPage, promptText) {
     try {
-        const inputSelector = 'textarea';
-        await spicyPage.waitForSelector(inputSelector, { timeout: 15000 });
+        const inputSelector = 'textarea, div[contenteditable="true"], [placeholder*="Message"], [placeholder*="message"]';
+        
+        await spicyPage.waitForSelector(inputSelector, { visible: true, timeout: 20000 }).catch(async (err) => {
+            console.log("[SpicyChat] Lỗi: Không thấy ô chat! Đang tiến hành chụp ảnh up ImgBB...");
+            await captureAndUploadDebug(spicyPage, laziPage, "noselector");
+            throw err;
+        });
 
-        // Đếm số lượng tin nhắn hiện tại để biết khi nào AI nhả tin nhắn mới
         const initialMsgCount = await spicyPage.evaluate(() => {
             return document.querySelectorAll('div[class*="message"], div[class*="chat-bubble"], .prose').length;
         });
 
-        // Click focus vào ô chat
-        await spicyPage.click(inputSelector);
-        
-        // Clear sạch dữ liệu cũ trong textarea nếu có
-        await spicyPage.evaluate((selector) => {
-            const el = document.querySelector(selector);
-            if (el) el.value = '';
+        await spicyPage.evaluate((sel) => {
+            const el = document.querySelector(sel);
+            if (el) {
+                el.focus();
+                if (el.tagName === 'TEXTAREA') el.value = '';
+                else el.innerText = '';
+            }
         }, inputSelector);
 
-        // Gõ nội dung (Sử dụng type để trigger React State)
-        await spicyPage.type(inputSelector, promptText, { delay: 5 });
+        const inputEl = await spicyPage.$(inputSelector);
+        if (inputEl) await inputEl.click();
 
-        await new Promise(r => setTimeout(r, 300));
+        await spicyPage.type(inputSelector, promptText, { delay: 10 });
+        await new Promise(r => setTimeout(r, 500));
 
-        // Nhấn Enter để gửi
         await spicyPage.keyboard.press('Enter');
 
-        // Bổ sung: Click nút submit nếu Enter chưa gửi được
         await spicyPage.evaluate(() => {
-            const btn = document.querySelector('button[type="submit"]') || document.querySelector('button:has(svg)');
+            const btn = document.querySelector('button[type="submit"]') || 
+                        document.querySelector('button:has(svg)') ||
+                        document.querySelector('button[aria-label*="Send"]');
             if (btn && !btn.disabled) btn.click();
         });
 
@@ -124,7 +181,6 @@ async function askSpicyChat(spicyPage, promptText) {
 
             const currentText = await spicyPage.evaluate((initCount) => {
                 const msgNodes = document.querySelectorAll('div[class*="message"], div[class*="chat-bubble"], .prose');
-                // Nếu chưa có tin nhắn mới xuất hiện thì đợi tiếp
                 if (msgNodes.length <= initCount) return null;
                 
                 const lastNode = msgNodes[msgNodes.length - 1];
@@ -133,9 +189,7 @@ async function askSpicyChat(spicyPage, promptText) {
 
             if (currentText && currentText === lastText && currentText.length > 0) {
                 stableCount++;
-                if (stableCount >= 2) {
-                    return currentText;
-                }
+                if (stableCount >= 2) return currentText;
             } else if (currentText) {
                 lastText = currentText;
                 stableCount = 0;
@@ -213,19 +267,19 @@ async function injectScanner(page) {
     const spicyPage = await browser.newPage();
     await spicyPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     
-    // Nạp cookie SpicyChat
     const formattedSpicyCookies = formatCookies(RAW_SPICYCHAT_DATA.cookies);
     for (const ck of formattedSpicyCookies) {
         await spicyPage.setCookie(ck);
     }
 
-    await spicyPage.goto('https://spicychat.ai/chat/134a8d8c-334d-4a45-8677-5fc00b76f58c/f901a5ef-3036-4fae-8669-941f2ef3f51e', { waitUntil: 'networkidle2', timeout: 60000 });
+    await spicyPage.goto('https://spicychat.ai/chat/134a8d8c-334d-4a45-8677-5fc00b76f58c/f901a5ef-3036-4fae-8669-941f2ef3f51e', { waitUntil: 'networkidle2', timeout: 60000 }).catch(async (e) => {
+        console.log("[Lỗi Load SpicyChat]:", e.message);
+    });
     console.log("-> Đã nạp thành công SpicyChat UI với Session!");
 
     const laziPage = await browser.newPage();
     await laziPage.setViewport({ width: 1280, height: 800 });
 
-    // Nạp cookie Lazi
     for (const ck of RAW_LAZI_COOKIES) {
         await laziPage.setCookie(ck);
     }
@@ -248,7 +302,7 @@ async function injectScanner(page) {
                 let prompt = `[Hệ thống: Bạn đang nhắn tin với "${targetName}" trên Lazi. Xưng hô phù hợp, hài hước, cá tính. Không nhận là AI.]\n\nNgữ cảnh:\n${contextText}\n\nTrả lời ngắn gọn:`;
                 
                 try {
-                    let aiReply = await askSpicyChat(spicyPage, prompt);
+                    let aiReply = await askSpicyChat(spicyPage, laziPage, prompt);
                     
                     if (aiReply && aiReply.trim()) {
                         console.log(`[Gốc AI]: ${aiReply.trim()}`);
@@ -279,6 +333,7 @@ async function injectScanner(page) {
                     }
                 } catch (err) {
                     console.error(`[Lỗi Box ${boxId}]:`, err.message);
+                    await captureAndUploadDebug(spicyPage, laziPage, `box_error_${boxId}`);
                 } finally {
                     processingBoxes.delete(boxId);
                 }
@@ -316,6 +371,7 @@ async function injectScanner(page) {
                 timeSinceLastReload = 0;
             } catch (reloadErr) {
                 console.error("[Lỗi Reload]:", reloadErr.message);
+                await captureAndUploadDebug(spicyPage, laziPage, "reload_error");
             }
         }
     }
