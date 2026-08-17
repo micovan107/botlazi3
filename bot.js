@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer');
 const { execSync } = require('child_process');
+const fs = require('fs');
 
 // Link SpicyChat
 const SPICYCHAT_URL = "https://spicychat.ai/chat/134a8d8c-334d-4a45-8677-5fc00b76f58c/f901a5ef-3036-4fae-8669-941f2ef3f51e";
@@ -31,24 +32,46 @@ const processingBoxes = new Set();
 
 async function askSpicyChat(spicyPage, promptText) {
     try {
-        // Sử dụng selector chuẩn dựa theo class của thẻ textarea
-        const inputSelector = 'textarea[placeholder="Message..."]';
-        await spicyPage.waitForSelector(inputSelector, { timeout: 15000 });
+        const selectors = [
+            'textarea[placeholder*="Message"]',
+            'textarea[placeholder*="message"]',
+            'textarea.resize-none',
+            'textarea'
+        ];
 
-        // Đếm số lượng tin nhắn bot hiện tại để làm mốc
+        let inputSelector = null;
+
+        for (const sel of selectors) {
+            try {
+                await spicyPage.waitForSelector(sel, { visible: true, timeout: 4000 });
+                inputSelector = sel;
+                break;
+            } catch (e) {}
+        }
+
+        if (!inputSelector) {
+            console.error("❌ Không tìm thấy textarea! Đang lưu HTML trang...");
+            const htmlContent = await spicyPage.content();
+            fs.writeFileSync('spicychat_dump.html', htmlContent);
+            console.log("-> Đã ghi file spicychat_dump.html");
+            return null;
+        }
+
         const initialBotMsgCount = await spicyPage.evaluate(() => {
             return document.querySelectorAll('div[class*="ChatMessage_bot"], div[data-is-user="false"], .chat-message.bot, div[data-is-bot="true"]').length;
         });
 
-        // Click trực tiếp và xoá dữ liệu cũ nếu có
-        await spicyPage.click(inputSelector);
+        await spicyPage.focus(inputSelector);
         await spicyPage.evaluate((sel) => {
             const el = document.querySelector(sel);
-            if (el) el.value = '';
+            if (el) {
+                el.value = '';
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+            }
         }, inputSelector);
 
-        // Gõ và gửi tin nhắn
-        await spicyPage.type(inputSelector, promptText);
+        await spicyPage.type(inputSelector, promptText, { delay: 10 });
+        await new Promise(r => setTimeout(r, 300));
         await spicyPage.keyboard.press('Enter');
 
         let lastText = "";
@@ -147,7 +170,6 @@ async function injectScanner(page) {
         ]
     });
 
-    // Tab 1: Mở SpicyChat
     console.log("Đang nạp cookie và khởi tạo SpicyChat...");
     const spicyPage = await browser.newPage();
     await spicyPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
@@ -159,7 +181,6 @@ async function injectScanner(page) {
     await spicyPage.goto(SPICYCHAT_URL, { waitUntil: 'networkidle2', timeout: 60000 });
     console.log("-> Mở SpicyChat thành công!");
 
-    // Tab 2: Mở Lazi
     const laziPage = await browser.newPage();
     await laziPage.setViewport({ width: 1280, height: 800 });
 
@@ -233,7 +254,7 @@ async function injectScanner(page) {
 
     await injectScanner(laziPage);
 
-    const TOTAL_RUN_TIME = 21300000; // ~5.9 tiếng
+    const TOTAL_RUN_TIME = 21300000;
     const CHECK_INTERVAL = 10000;
     let timeElapsed = 0;
 
