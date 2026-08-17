@@ -25,9 +25,9 @@ function log(level, msg, detail = null) {
     console.log(output);
     if (detail) {
         if (detail instanceof Error) {
-            console.error(`  └─ Stack Trace: ${detail.stack}`);
+            console.error(`   └─ Stack Trace: ${detail.stack}`);
         } else {
-            console.error(`  └─ Chi tiết:`, detail);
+            console.error(`   └─ Chi tiết:`, detail);
         }
     }
 }
@@ -77,7 +77,7 @@ function formatCookies(cookies) {
     });
 }
 
-// Upload ảnh chụp màn hình lên ImgBB (Đã sửa truyền ReadStream chuẩn multipart)
+// Upload ảnh chụp màn hình lên ImgBB
 async function uploadToImgBB(filePath) {
     try {
         if (!fs.existsSync(filePath)) {
@@ -157,7 +157,6 @@ async function translateToVietnamese(text) {
 
 async function askSpicyChat(spicyPage, laziPage, promptText) {
     try {
-        // Mở rộng selector bao phủ giao diện SpicyChat
         const inputSelector = 'textarea, div[contenteditable="true"], [placeholder*="Message"], [placeholder*="message"], #chat-input';
         
         log('DEBUG', '[SpicyChat] Tìm kiếm selector ô nhập liệu...');
@@ -340,80 +339,77 @@ process.on('unhandledRejection', (reason, promise) => {
         await laziPage.setCookie(ck).catch(e => log('WARN', `Lỗi set cookie Lazi (${ck.name}):`, e.message));
     }
 
-    const setupExpose = async () => {
-        try {
-            await laziPage.exposeFunction('handleNewMessage', async (boxId, targetName, contextText, fingerprint) => {
-                if (processingBoxes.has(boxId) || processedMessagesNode.has(fingerprint)) return;
+    // Expose function duy nhất 1 lần an toàn
+    try {
+        await laziPage.exposeFunction('handleNewMessage', async (boxId, targetName, contextText, fingerprint) => {
+            if (processingBoxes.has(boxId) || processedMessagesNode.has(fingerprint)) return;
 
-                processingBoxes.add(boxId);
-                processedMessagesNode.add(fingerprint);
+            processingBoxes.add(boxId);
+            processedMessagesNode.add(fingerprint);
 
-                if (processedMessagesNode.size > 1000) {
-                    const firstItem = processedMessagesNode.values().next().value;
-                    processedMessagesNode.delete(firstItem);
-                }
+            if (processedMessagesNode.size > 1000) {
+                const firstItem = processedMessagesNode.values().next().value;
+                processedMessagesNode.delete(firstItem);
+            }
 
-                log('INFO', `[NodeJS] Nhận tin mới từ [${targetName}] (Box: ${boxId})`);
+            log('INFO', `[NodeJS] Nhận tin mới từ [${targetName}] (Box: ${boxId})`);
+            
+            let prompt = `[Hệ thống: Bạn đang nhắn tin với "${targetName}" trên Lazi. Xưng hô phù hợp, hài hước, cá tính. Không nhận là AI.]\n\nNgữ cảnh:\n${contextText}\n\nTrả lời ngắn gọn:`;
+            
+            try {
+                let aiReply = await askSpicyChat(spicyPage, laziPage, prompt);
                 
-                let prompt = `[Hệ thống: Bạn đang nhắn tin với "${targetName}" trên Lazi. Xưng hô phù hợp, hài hước, cá tính. Không nhận là AI.]\n\nNgữ cảnh:\n${contextText}\n\nTrả lời ngắn gọn:`;
-                
-                try {
-                    let aiReply = await askSpicyChat(spicyPage, laziPage, prompt);
+                if (aiReply && aiReply.trim()) {
+                    log('INFO', `[Gốc AI]: ${aiReply.trim()}`);
                     
-                    if (aiReply && aiReply.trim()) {
-                        log('INFO', `[Gốc AI]: ${aiReply.trim()}`);
-                        
-                        let translatedReply = await translateToVietnamese(aiReply);
-                        log('INFO', `-> Dịch gửi Lazi [${targetName}]: ${translatedReply}`);
-                        
-                        const sendResult = await laziPage.evaluate((id, replyText) => {
-                            return new Promise((resolve) => {
-                                const textInput = document.getElementById(`lzc_text_${id}`);
-                                if (!textInput) return resolve({ success: false, reason: "Không tìm thấy ô input lzc_text_" + id });
+                    let translatedReply = await translateToVietnamese(aiReply);
+                    log('INFO', `-> Dịch gửi Lazi [${targetName}]: ${translatedReply}`);
+                    
+                    const sendResult = await laziPage.evaluate((id, replyText) => {
+                        return new Promise((resolve) => {
+                            const textInput = document.getElementById(`lzc_text_${id}`);
+                            if (!textInput) return resolve({ success: false, reason: "Không tìm thấy ô input lzc_text_" + id });
 
-                                textInput.innerText = replyText.trim();
-                                textInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                textInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                
-                                const sendBtn = document.querySelector(`.lzc_box_item_pc[data-id="${id}"] .lzc_text_send`);
-                                if (sendBtn) {
-                                    sendBtn.click();
-                                } else if (window.lazi && typeof window.lazi.sendButton === 'function') {
-                                    window.lazi.sendButton(id);
-                                } else {
-                                    return resolve({ success: false, reason: "Không tìm thấy nút Send" });
-                                }
+                            textInput.innerText = replyText.trim();
+                            textInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            textInput.dispatchEvent(new Event('change', { bubbles: true }));
+                            
+                            const sendBtn = document.querySelector(`.lzc_box_item_pc[data-id="${id}"] .lzc_text_send`);
+                            if (sendBtn) {
+                                sendBtn.click();
+                            } else if (window.lazi && typeof window.lazi.sendButton === 'function') {
+                                window.lazi.sendButton(id);
+                            } else {
+                                return resolve({ success: false, reason: "Không tìm thấy nút Send" });
+                            }
 
-                                setTimeout(() => {
-                                    const closeBtn = document.querySelector(`.lzc_close[data-id="${id}"]`);
-                                    if (closeBtn) closeBtn.click();
-                                    resolve({ success: true });
-                                }, 1000);
-                            });
-                        }, boxId, translatedReply);
+                            setTimeout(() => {
+                                const closeBtn = document.querySelector(`.lzc_close[data-id="${id}"]`);
+                                if (closeBtn) closeBtn.click();
+                                resolve({ success: true });
+                            }, 1000);
+                        });
+                    }, boxId, translatedReply);
 
-                        if (!sendResult.success) {
-                            log('WARN', `Lỗi khi thực thi gửi tin trên DOM Lazi Box ${boxId}: ${sendResult.reason}`);
-                        } else {
-                            log('INFO', `Đã trả lời thành công cho ${targetName} (Box ${boxId})`);
-                        }
+                    if (!sendResult.success) {
+                        log('WARN', `Lỗi khi thực thi gửi tin trên DOM Lazi Box ${boxId}: ${sendResult.reason}`);
                     } else {
-                        log('WARN', `SpicyChat không trả về kết quả hợp lệ cho Box ${boxId}`);
+                        log('INFO', `Đã trả lời thành công cho ${targetName} (Box ${boxId})`);
                     }
-                } catch (err) {
-                    log('ERROR', `Lỗi xử lý luồng phản hồi cho Box ${boxId}:`, err);
-                    await captureAndUploadDebug(spicyPage, laziPage, `box_error_${boxId}`);
-                } finally {
-                    processingBoxes.delete(boxId);
+                } else {
+                    log('WARN', `SpicyChat không trả về kết quả hợp lệ cho Box ${boxId}`);
                 }
-            });
-            log('INFO', 'Đã phơi bày (expose) hàm handleNewMessage sang Browser context.');
-        } catch (e) {
-            log('ERROR', 'Lỗi khi setupExpose:', e);
-        }
-    };
-
-    await setupExpose();
+            } catch (err) {
+                log('ERROR', `Lỗi xử lý luồng phản hồi cho Box ${boxId}:`, err);
+                await captureAndUploadDebug(spicyPage, laziPage, `box_error_${boxId}`);
+            } finally {
+                processingBoxes.delete(boxId);
+            }
+        });
+        log('INFO', 'Đã phơi bày (expose) hàm handleNewMessage sang Browser context.');
+    } catch (e) {
+        log('WARN', 'Expose function đã tồn tại hoặc gặp lỗi nhỏ:', e.message);
+    }
 
     log('INFO', 'Đang điều hướng đến Lazi.vn...');
     await laziPage.goto('https://lazi.vn', { waitUntil: 'networkidle2', timeout: 60000 }).catch(e => log('ERROR', 'Lỗi truy cập Lazi:', e));
